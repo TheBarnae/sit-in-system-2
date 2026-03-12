@@ -5,117 +5,58 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard | CCS Sit-in Monitoring</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
-<body>
-  <div class="dash-wrapper">
-    <!-- Sidebar -->
-    <aside class="sidebar" id="sidebar">
-      <div class="sidebar-brand">
-        <img src="{{ url_for('static', filename='images/CCS_UC.png') }}" alt="Logo">
-        <span>CCS Sit-in<br>Monitoring</span>
+<body class="bg-light">
+  <!-- Navbar -->
+  <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+    <div class="container">
+      <a class="navbar-brand" href="/dashboard">
+        <img src="{{ url_for('static', filename='images/CCS_UC.png') }}" alt="Logo" width="30" class="me-2">
+        CCS Sit-in Monitoring
+      </a>
+      <div class="ms-auto">
+        <span class="text-white me-3">Hello, {{ user.first_name }}!</span>
+        <a href="/logout" class="btn btn-outline-light btn-sm">Logout</a>
       </div>
-      <ul class="sidebar-nav">
-        <li><a href="/dashboard" class="active"><i class="bi bi-grid-1x2-fill"></i> Dashboard</a></li>
-        <li><a href="#"><i class="bi bi-person-fill"></i> Profile</a></li>
-        <li><a href="#"><i class="bi bi-clock-history"></i> Sit-in History</a></li>
-        <li><a href="#"><i class="bi bi-megaphone-fill"></i> Announcements</a></li>
-      </ul>
-      <div class="sidebar-footer">
-        <a href="/logout"><i class="bi bi-box-arrow-left"></i> Sign Out</a>
-      </div>
-    </aside>
+    </div>
+  </nav>
 
-    <!-- Main -->
-    <main class="dash-main">
-      <!-- Top bar -->
-      <div class="dash-topbar">
-        <div class="d-flex align-items-center gap-3">
-          <button class="btn btn-sm d-lg-none" onclick="document.getElementById('sidebar').classList.toggle('open')">
-            <i class="bi bi-list fs-4"></i>
-          </button>
-          <h4>Dashboard</h4>
-        </div>
-        <div class="user-badge">
-          <span>{{ user.first_name }} {{ user.last_name }}</span>
-          <div class="user-avatar">{{ user.first_name[0] }}{{ user.last_name[0] }}</div>
+  <div class="container mt-4">
+    <!-- Session summary -->
+    <div class="row mb-4">
+      <div class="col-md-4 mb-3">
+        <div class="info-card text-center">
+          <h6 class="text-muted">Sessions Used</h6>
+          <h2 class="text-primary">{{ sessions_used }}</h2>
         </div>
       </div>
-
-      <!-- Content -->
-      <div class="dash-content fade-in">
-        <!-- Welcome banner -->
-        <div class="welcome-banner">
-          <h2><i class="bi bi-hand-wave"></i> Welcome, {{ user.first_name }}!</h2>
-          <p>Here's an overview of your sit-in sessions at the College of Computer Studies.</p>
-        </div>
-
-        <!-- Stat cards -->
-        <div class="row g-4 mb-4">
-          <div class="col-md-4">
-            <div class="stat-card">
-              <div class="stat-icon purple"><i class="bi bi-journal-check"></i></div>
-              <div class="stat-info">
-                <h3>{{ sessions_used }}</h3>
-                <p>Sessions Used</p>
-              </div>
-            </div>
-          </div>
-          <div class="col-md-4">
-            <div class="stat-card">
-              <div class="stat-icon green"><i class="bi bi-hourglass-split"></i></div>
-              <div class="stat-info">
-                <h3>{{ sessions_remaining }}</h3>
-                <p>Sessions Remaining</p>
-              </div>
-            </div>
-          </div>
-          <div class="col-md-4">
-            <div class="stat-card">
-              <div class="stat-icon orange"><i class="bi bi-calendar-event"></i></div>
-              <div class="stat-info">
-                <h3>30</h3>
-                <p>Total Allowed</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="row g-4">
-          <!-- Student info -->
-          <div class="col-lg-7">
-            <div class="info-card">
-              <h5><i class="bi bi-person-circle"></i> Student Information</h5>
-              <table class="info-table w-100">
-                <tr><td>ID Number</td><td>{{ user.id_number }}</td></tr>
-                <tr><td>Name</td><td>{{ user.last_name }}, {{ user.first_name }} {{ user.middle_name }}</td></tr>
-                <tr><td>Course</td><td>{{ user.course }}</td></tr>
-                <tr><td>Year Level</td><td>{{ user.course_level }}</td></tr>
-                <tr><td>Email</td><td>{{ user.email }}</td></tr>
-                <tr><td>Address</td><td>{{ user.address }}</td></tr>
-              </table>
-            </div>
-          </div>
-
-          <!-- Session ring -->
-          <div class="col-lg-5">
-            <div class="info-card text-center">
-              <h5 class="justify-content-center"><i class="bi bi-pie-chart-fill"></i> Session Usage</h5>
-              <div class="session-ring" style="--progress: {{ (sessions_used / 30 * 100) | int }}%;">
-                <div class="session-ring-inner">
-                  <span class="number">{{ sessions_remaining }}</span>
-                  <span class="label">remaining</span>
-                </div>
-              </div>
-              <p class="text-muted" style="font-size:.85rem;">
-                You have used <strong>{{ sessions_used }}</strong> out of <strong>30</strong> sit-in sessions.
-              </p>
-            </div>
-          </div>
+      <div class="col-md-4 mb-3">
+        <div class="info-card text-center">
+          <h6 class="text-muted">Remaining</h6>
+          <h2 class="text-success">{{ sessions_remaining }}</h2>
         </div>
       </div>
-    </main>
+      <div class="col-md-4 mb-3">
+        <div class="info-card text-center">
+          <h6 class="text-muted">Total Allowed</h6>
+          <h2>30</h2>
+        </div>
+      </div>
+    </div>
+
+    <!-- Student info -->
+    <div class="info-card">
+      <h5 class="mb-3">Student Information</h5>
+      <table class="info-table w-100">
+        <tr><td>ID Number</td><td>{{ user.id_number }}</td></tr>
+        <tr><td>Name</td><td>{{ user.last_name }}, {{ user.first_name }} {{ user.middle_name }}</td></tr>
+        <tr><td>Course</td><td>{{ user.course }}</td></tr>
+        <tr><td>Year Level</td><td>{{ user.course_level }}</td></tr>
+        <tr><td>Email</td><td>{{ user.email }}</td></tr>
+        <tr><td>Address</td><td>{{ user.address }}</td></tr>
+      </table>
+    </div>
   </div>
 </body>
 </html>
