@@ -86,6 +86,22 @@ body {
   object-fit: contain;
 }
 
+/* Page content area below navbar */
+.page-content {
+  min-height: calc(100vh - 56px);
+}
+
+/* About "Back to Home" button */
+.btn-back-home {
+  color: #2c5364;
+  border-color: #2c5364;
+}
+
+.btn-back-home:hover {
+  background: #2c5364;
+  color: #fff;
+}
+
 /* ABOUT PAGE */
 .about-card {
   background: #fff;

@@ -12,7 +12,7 @@
   <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
     <div class="container-fluid">
       <a class="navbar-brand" href="/">College of Computer Studies Sit-in Monitoring System</a>
-      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navLinks">
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navLinks" title="Toggle navigation">
         <span class="navbar-toggler-icon"></span>
       </button>
       <div class="collapse navbar-collapse" id="navLinks">
@@ -25,7 +25,7 @@
     </div>
   </nav>
 
-  <div class="container d-flex justify-content-center align-items-center" style="min-height: calc(100vh - 56px);">
+  <div class="container d-flex justify-content-center align-items-center page-content">
     <div class="register-card">
       <div class="text-center mb-3">
         <img src="{{ url_for('static', filename='images/uclogo.png') }}" alt="UC Logo" class="register-logo">
@@ -58,7 +58,7 @@
           </div>
           <div class="col-md-6 mb-3">
             <label class="form-label">Course</label>
-            <select class="form-select" name="course" required>
+            <select class="form-select" name="course" title="Course" required>
               <option value="" disabled selected>Select course</option>
               <option value="BSIT">BSIT</option>
               <option value="BSCS">BSCS</option>
@@ -67,7 +67,7 @@
           </div>
           <div class="col-md-6 mb-3">
             <label class="form-label">Year Level</label>
-            <select class="form-select" name="course_level" required>
+            <select class="form-select" name="course_level" title="Year Level" required>
               <option value="" disabled selected>Select year</option>
               <option value="1">1st Year</option>
               <option value="2">2nd Year</option>
