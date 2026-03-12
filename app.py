@@ -26,6 +26,11 @@ def register():
     return render_template('register.html')
 
 
+@app.route('/about')
+def about():
+    return render_template('about.html')
+
+
 @app.route('/login_user', methods=['POST'])
 def login_user():
     id_number = request.form['id_number']

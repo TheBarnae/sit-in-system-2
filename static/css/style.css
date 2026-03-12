@@ -1,44 +1,124 @@
 /* GLOBAL */
 body {
-  font-family: Arial, sans-serif;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   min-height: 100vh;
 }
 
 /* LOGIN & REGISTER PAGES */
 .login-bg {
-  background: linear-gradient(135deg, #1e3c72, #2a5298);
+  background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
   min-height: 100vh;
 }
 
 .login-card {
-  background: white;
-  padding: 35px;
-  border-radius: 10px;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+  background: #fff;
+  padding: 40px 35px;
+  border-radius: 12px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
   max-width: 430px;
   width: 100%;
 }
 
+.login-card .form-control {
+  padding: 11px 14px;
+  font-size: 15px;
+  border-radius: 8px;
+  border: 1px solid #ced4da;
+}
+
+.login-card .form-control:focus {
+  border-color: #2c5364;
+  box-shadow: 0 0 0 3px rgba(44, 83, 100, 0.15);
+}
+
+.login-card .btn-primary {
+  padding: 11px;
+  font-size: 16px;
+  font-weight: 600;
+  border-radius: 8px;
+  background: #2c5364;
+  border-color: #2c5364;
+}
+
+.login-card .btn-primary:hover {
+  background: #203a43;
+  border-color: #203a43;
+}
+
 .register-card {
-  background: white;
-  padding: 35px;
-  border-radius: 10px;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
-  max-width: 700px;
+  background: #fff;
+  padding: 40px 35px;
+  border-radius: 12px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+  max-width: 720px;
   width: 100%;
+}
+
+.register-card .form-control,
+.register-card .form-select {
+  padding: 10px 14px;
+  font-size: 15px;
+  border-radius: 8px;
+}
+
+.register-card .form-control:focus,
+.register-card .form-select:focus {
+  border-color: #2c5364;
+  box-shadow: 0 0 0 3px rgba(44, 83, 100, 0.15);
+}
+
+.register-card .btn-success {
+  padding: 11px;
+  font-size: 16px;
+  font-weight: 600;
+  border-radius: 8px;
+  background: #198754;
+  border-color: #198754;
+}
+
+.register-card .btn-success:hover {
+  background: #157347;
+}
+
+.register-logo {
+  width: 80px;
+  height: 80px;
+  object-fit: contain;
+}
+
+/* ABOUT PAGE */
+.about-card {
+  background: #fff;
+  padding: 40px;
+  border-radius: 12px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+  max-width: 750px;
+  width: 100%;
+}
+
+.about-logo {
+  width: 100px;
+  height: 100px;
+  object-fit: contain;
 }
 
 /* DASHBOARD */
 .info-card {
-  background: white;
+  background: #fff;
   padding: 25px;
-  border-radius: 10px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
 }
 
 .info-table td {
-  padding: 8px 0;
+  padding: 10px 0;
   border-bottom: 1px solid #eee;
+}
+
+.info-table td:first-child {
+  font-weight: 600;
+  color: #555;
+  width: 150px;
 }
 
 .info-table td:first-child {

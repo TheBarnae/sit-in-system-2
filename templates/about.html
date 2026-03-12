@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>About | CCS Sit-in Monitoring</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="login-bg">
+  <!-- Navbar -->
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="/">College of Computer Studies Sit-in Monitoring System</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navLinks">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navLinks">
+        <ul class="navbar-nav ms-auto">
+          <li class="nav-item"><a class="nav-link" href="/">Home</a></li>
+          <li class="nav-item"><a class="nav-link" href="/about">About</a></li>
+          <li class="nav-item"><a class="nav-link" href="/register">Register</a></li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container d-flex justify-content-center align-items-center" style="min-height: calc(100vh - 56px);">
+    <div class="about-card text-center">
+      <!-- Logos -->
+      <div class="d-flex justify-content-center align-items-center gap-4 mb-4">
+        <img src="{{ url_for('static', filename='images/uclogo.png') }}" alt="UC Logo" class="about-logo">
+        <img src="{{ url_for('static', filename='images/CCS_UC.png') }}" alt="CCS Logo" class="about-logo">
+      </div>
+
+      <h3 class="mb-2">University of Cebu</h3>
+      <h5 class="text-muted mb-4">College of Computer Studies</h5>
+
+      <hr>
+
+      <div class="text-start mt-4">
+        <h5 class="mb-3">About the University</h5>
+        <p>
+          The University of Cebu (UC) is one of the leading educational institutions in Cebu City, Philippines.
+          Founded in 1964, UC is committed to providing quality education and producing globally competitive graduates.
+          The university offers a wide range of programs across multiple disciplines and continues to uphold
+          its mission of academic excellence and community service.
+        </p>
+
+        <h5 class="mb-3 mt-4">About the Department</h5>
+        <p>
+          The College of Computer Studies (CCS) is dedicated to producing skilled IT professionals
+          equipped with the knowledge and competencies needed in the fast-evolving technology industry.
+          CCS offers programs such as Bachelor of Science in Information Technology (BSIT),
+          Bachelor of Science in Computer Science (BSCS), and Associate in Computer Technology (ACT).
+        </p>
+
+        <h5 class="mb-3 mt-4">About this System</h5>
+        <p>
+          The CCS Sit-in Monitoring System is designed to track and manage student sit-in sessions
+          within the CCS computer laboratories. It helps ensure proper monitoring of lab usage
+          and maintains an organized record of student attendance.
+        </p>
+      </div>
+
+      <a href="/" class="btn btn-outline-light mt-3" style="color: #2c5364; border-color: #2c5364;">Back to Home</a>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
