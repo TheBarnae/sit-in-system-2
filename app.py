@@ -123,5 +123,58 @@ def logout():
     return redirect('/')
 
 
+@app.route('/edit_profile', methods=['GET', 'POST'])
+def edit_profile():
+    if 'user' not in session:
+        return redirect('/')
+
+    user = session['user']
+    if request.method == 'POST':
+        first_name = request.form['first_name']
+        middle_name = request.form['middle_name']
+        last_name = request.form['last_name']
+        course = request.form['course']
+        course_level = request.form['course_level']
+        email = request.form['email']
+        address = request.form['address']
+
+        changes = (
+            first_name != user['first_name'] or
+            middle_name != user['middle_name'] or
+            last_name != user['last_name'] or
+            course != user['course'] or
+            course_level != user['course_level'] or
+            email != user['email'] or
+            address != user['address']
+        )
+
+        if changes:
+            db = get_db()
+            cursor = db.cursor()
+            cursor.execute("""
+                UPDATE users SET first_name=%s, middle_name=%s, last_name=%s, course=%s, course_level=%s, email=%s, address=%s
+                WHERE id_number=%s
+            """, (first_name, middle_name, last_name, course, course_level, email, address, user['id_number']))
+            db.commit()
+            cursor.close()
+            db.close()
+
+            session['user'].update({
+                'first_name': first_name,
+                'middle_name': middle_name,
+                'last_name': last_name,
+                'course': course,
+                'course_level': course_level,
+                'email': email,
+                'address': address,
+            })
+            flash('A change has been done', 'success')
+        else:
+            flash('No changes were done', 'info')
+        return redirect('/dashboard')
+
+    return render_template('edit_profile.html', user=user)
+
+
 if __name__ == '__main__':
     app.run(debug=True)

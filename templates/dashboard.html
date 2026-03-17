@@ -50,7 +50,10 @@
 
     <!-- Student info -->
     <div class="info-card">
-      <h5 class="mb-3">Student Information</h5>
+      <h5 class="mb-3 d-flex justify-content-between align-items-center">
+        Student Information
+        <a href="/edit_profile" class="btn btn-sm btn-secondary">Edit Profile</a>
+      </h5>
       <table class="info-table w-100">
         <tr><td>ID Number</td><td>{{ user.id_number }}</td></tr>
         <tr><td>Name</td><td>{{ user.last_name }}, {{ user.first_name }} {{ user.middle_name }}</td></tr>
