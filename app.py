@@ -1,10 +1,19 @@
 from flask import Flask, render_template, request, redirect, session, flash, url_for
+from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 import mysql.connector
 import os
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
+app.config['UPLOAD_FOLDER'] = os.path.join('static', 'uploads')
+app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024
+
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
 def get_db():
@@ -53,6 +62,7 @@ def login_user():
             'course_level': user['course_level'],
             'email': user['email'] or '',
             'address': user['address'] or '',
+            'photo_path': user.get('photo_path') or '',
         }
         return redirect('/dashboard')
 
@@ -137,6 +147,24 @@ def edit_profile():
         course_level = request.form['course_level']
         email = request.form['email']
         address = request.form['address']
+        photo_file = request.files.get('photo')
+        photo_path = user.get('photo_path') or ''
+        new_photo_path = photo_path
+        photo_changed = False
+
+        if photo_file and photo_file.filename:
+            if not allowed_file(photo_file.filename):
+                flash('Invalid photo type. Use PNG, JPG, or GIF.', 'danger')
+                return redirect('/edit_profile')
+
+            filename = secure_filename(photo_file.filename)
+            ext = os.path.splitext(filename)[1].lower()
+            stored_name = f"{user['id_number']}{ext}"
+            upload_dir = app.config['UPLOAD_FOLDER']
+            os.makedirs(upload_dir, exist_ok=True)
+            photo_file.save(os.path.join(upload_dir, stored_name))
+            new_photo_path = f"uploads/{stored_name}"
+            photo_changed = new_photo_path != photo_path
 
         changes = (
             first_name != user['first_name'] or
@@ -145,16 +173,17 @@ def edit_profile():
             course != user['course'] or
             course_level != user['course_level'] or
             email != user['email'] or
-            address != user['address']
+            address != user['address'] or
+            photo_changed
         )
 
         if changes:
             db = get_db()
             cursor = db.cursor()
             cursor.execute("""
-                UPDATE users SET first_name=%s, middle_name=%s, last_name=%s, course=%s, course_level=%s, email=%s, address=%s
+                UPDATE users SET first_name=%s, middle_name=%s, last_name=%s, course=%s, course_level=%s, email=%s, address=%s, photo_path=%s
                 WHERE id_number=%s
-            """, (first_name, middle_name, last_name, course, course_level, email, address, user['id_number']))
+            """, (first_name, middle_name, last_name, course, course_level, email, address, new_photo_path, user['id_number']))
             db.commit()
             cursor.close()
             db.close()
@@ -167,10 +196,11 @@ def edit_profile():
                 'course_level': course_level,
                 'email': email,
                 'address': address,
+                'photo_path': new_photo_path,
             })
-            flash('A change has been done', 'success')
+            flash('Changes successful.', 'success')
         else:
-            flash('No changes were done', 'info')
+            flash('No changes were made.', 'info')
         return redirect('/dashboard')
 
     return render_template('edit_profile.html', user=user)
