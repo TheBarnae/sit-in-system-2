@@ -1,0 +1,63 @@
+{% extends 'admin_base.html' %}
+{% set title = 'Admin Dashboard | CCS Sit-in Monitoring' %}
+
+{% block content %}
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <div class="stat-card text-center">
+      <div class="stat-label">Students Registered</div>
+      <div class="stat-value text-primary">{{ stats.students_registered }}</div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="stat-card text-center">
+      <div class="stat-label">Currently Sit-in</div>
+      <div class="stat-value text-success">{{ stats.currently_sit_in }}</div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="stat-card text-center">
+      <div class="stat-label">Total Sit-in</div>
+      <div class="stat-value">{{ stats.total_sit_in }}</div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-lg-7">
+    <div class="info-card">
+      <div class="d-flex align-items-center justify-content-between mb-3">
+        <h5 class="mb-0">Statistics</h5>
+        <span class="text-muted small">Program breakdown</span>
+      </div>
+      <div class="chart-placeholder">
+        <div class="chart-legend">
+          <span class="legend-dot dot-blue"></span> C#
+          <span class="legend-dot dot-orange"></span> C
+          <span class="legend-dot dot-yellow"></span> Java
+          <span class="legend-dot dot-green"></span> ASP.Net
+          <span class="legend-dot dot-pink"></span> PHP
+        </div>
+        <div class="chart-hole">Chart Area</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-5">
+    <div class="info-card">
+      <h5 class="mb-3">Announcement</h5>
+      <form>
+        <textarea class="form-control mb-3" rows="4" placeholder="New announcement"></textarea>
+        <button type="button" class="btn btn-success btn-sm">Submit</button>
+      </form>
+      <hr>
+      <h6 class="mb-3">Posted Announcement</h6>
+      {% for announcement in announcements %}
+        <div class="mb-3">
+          <div class="fw-semibold">{{ announcement.author }} | {{ announcement.date }}</div>
+          <div class="text-muted small">{{ announcement.body }}</div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}

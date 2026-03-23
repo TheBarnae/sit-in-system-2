@@ -40,6 +40,148 @@ def about():
     return render_template('about.html')
 
 
+def get_admin_mock_data():
+    stats = {
+        'students_registered': 38,
+        'currently_sit_in': 0,
+        'total_sit_in': 15,
+    }
+
+    announcements = [
+        {
+            'author': 'CCS Admin',
+            'date': '2026-Feb-11',
+            'body': 'New announcement.'
+        },
+        {
+            'author': 'CCS Admin',
+            'date': '2024-May-08',
+            'body': 'Important announcement: Explore our latest products and services now!'
+        },
+    ]
+
+    students = [
+        {
+            'id_number': '123',
+            'name': 'Kimmy K. Negcassa',
+            'year_level': '1',
+            'course': 'BSIT',
+            'remaining': 30,
+        },
+        {
+            'id_number': '1234',
+            'name': 'Kris J. Rasi',
+            'year_level': '1',
+            'course': 'BSIT',
+            'remaining': 30,
+        },
+        {
+            'id_number': '2000',
+            'name': 'Jude Jefferson L. Sandalo',
+            'year_level': '4',
+            'course': 'BSIT',
+            'remaining': 29,
+        },
+        {
+            'id_number': '123123',
+            'name': 'Jermaine A. Aguilar',
+            'year_level': '3',
+            'course': 'BSIT',
+            'remaining': 30,
+        },
+        {
+            'id_number': '123456',
+            'name': 'Jan V. Sencador',
+            'year_level': '2',
+            'course': 'BSIT',
+            'remaining': 30,
+        },
+        {
+            'id_number': '3677937',
+            'name': 'Jeff Pelorina Salimbangon',
+            'year_level': '4',
+            'course': 'BSIT',
+            'remaining': 27,
+        },
+    ]
+
+    current_sitins = []
+
+    return stats, announcements, students, current_sitins
+
+
+@app.route('/admin')
+def admin_dashboard():
+    stats, announcements, students, current_sitins = get_admin_mock_data()
+    return render_template('admin_dashboard.html',
+                           stats=stats,
+                           announcements=announcements,
+                           students=students,
+                           current_sitins=current_sitins)
+
+
+@app.route('/admin/search')
+def admin_search():
+    return render_template('admin_search.html')
+
+
+@app.route('/admin/students')
+def admin_students():
+    db = get_db()
+    cursor = db.cursor(dictionary=True)
+    cursor.execute("""
+        SELECT id_number, last_name, first_name, middle_name, course, course_level
+        FROM users
+        WHERE id_number NOT LIKE 'adm-%'
+        ORDER BY last_name, first_name
+    """)
+    users = cursor.fetchall()
+    cursor.close()
+    db.close()
+
+    students = []
+    for user in users:
+        full_name = f"{user['last_name']}, {user['first_name']}"
+        if user.get('middle_name'):
+            full_name = f"{full_name} {user['middle_name']}"
+
+        students.append({
+            'id_number': user['id_number'],
+            'name': full_name,
+            'year_level': user['course_level'],
+            'course': user['course'],
+            'remaining': 30,
+        })
+
+    return render_template('admin_students.html', students=students)
+
+
+@app.route('/admin/sit-in')
+def admin_sit_in():
+    return render_template('admin_sit_in.html')
+
+
+@app.route('/admin/sit-in-records')
+def admin_sit_in_records():
+    stats, announcements, students, current_sitins = get_admin_mock_data()
+    return render_template('admin_sit_in_records.html', current_sitins=current_sitins)
+
+
+@app.route('/admin/sit-in-reports')
+def admin_sit_in_reports():
+    return render_template('admin_sit_in_reports.html')
+
+
+@app.route('/admin/feedback-reports')
+def admin_feedback_reports():
+    return render_template('admin_feedback_reports.html')
+
+
+@app.route('/admin/reservations')
+def admin_reservations():
+    return render_template('admin_reservations.html')
+
+
 @app.route('/login_user', methods=['POST'])
 def login_user():
     id_number = request.form['id_number']
@@ -64,6 +206,8 @@ def login_user():
             'address': user['address'] or '',
             'photo_path': user.get('photo_path') or '',
         }
+        if user['id_number'].lower().startswith('adm-'):
+            return redirect('/admin')
         return redirect('/dashboard')
 
     flash('Invalid ID number or password.', 'danger')

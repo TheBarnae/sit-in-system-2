@@ -1,0 +1,41 @@
+{% extends 'admin_base.html' %}
+{% set title = 'Sit-in | CCS Sit-in Monitoring' %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-6">
+    <div class="info-card">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="mb-0">Sit-in Form</h5>
+        <a class="btn-close" href="/admin" aria-label="Close"></a>
+      </div>
+      <form>
+        <div class="mb-3">
+          <label class="form-label">ID Number</label>
+          <input type="text" class="form-control" placeholder="ID Number">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Student Name</label>
+          <input type="text" class="form-control" placeholder="Student Name">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Purpose</label>
+          <input type="text" class="form-control" placeholder="Purpose">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Lab</label>
+          <input type="text" class="form-control" placeholder="Lab">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Remaining Session</label>
+          <input type="text" class="form-control" placeholder="Remaining Session">
+        </div>
+        <div class="d-flex justify-content-end gap-2">
+          <a href="/admin" class="btn btn-secondary">Close</a>
+          <button type="button" class="btn btn-primary">Sit In</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

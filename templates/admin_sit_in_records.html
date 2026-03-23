@@ -1,0 +1,46 @@
+{% extends 'admin_base.html' %}
+{% set title = 'Current Sit-in | CCS Sit-in Monitoring' %}
+
+{% block content %}
+<div class="info-card">
+  <h4 class="text-center mb-4">Current Sit in</h4>
+  <div class="table-responsive">
+    <table class="table align-middle">
+      <thead>
+        <tr>
+          <th>Sit ID Number</th>
+          <th>ID Number</th>
+          <th>Name</th>
+          <th>Purpose</th>
+          <th>Sit Lab</th>
+          <th>Session</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if current_sitins %}
+          {% for sitin in current_sitins %}
+            <tr>
+              <td>{{ sitin.sit_id }}</td>
+              <td>{{ sitin.id_number }}</td>
+              <td>{{ sitin.name }}</td>
+              <td>{{ sitin.purpose }}</td>
+              <td>{{ sitin.lab }}</td>
+              <td>{{ sitin.session }}</td>
+              <td>{{ sitin.status }}</td>
+              <td class="table-actions">
+                <button class="btn btn-primary btn-sm" type="button">View</button>
+              </td>
+            </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="8" class="text-center text-muted">No data available</td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

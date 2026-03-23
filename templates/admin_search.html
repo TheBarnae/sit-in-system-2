@@ -1,0 +1,19 @@
+{% extends 'admin_base.html' %}
+{% set title = 'Search | CCS Sit-in Monitoring' %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-6">
+    <div class="info-card">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="mb-0">Search Student</h5>
+        <a class="btn-close" href="/admin" aria-label="Close"></a>
+      </div>
+      <div class="input-group">
+        <input type="text" class="form-control" placeholder="Search...">
+        <button class="btn btn-primary" type="button">Search</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

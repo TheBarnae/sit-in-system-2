@@ -1,0 +1,43 @@
+{% extends 'admin_base.html' %}
+{% set title = 'Students | CCS Sit-in Monitoring' %}
+
+{% block content %}
+<div class="info-card">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0">Students Information</h5>
+    <div class="d-flex gap-2">
+      <button class="btn btn-primary btn-sm" type="button">Add Students</button>
+      <button class="btn btn-danger btn-sm" type="button">Reset All Session</button>
+    </div>
+  </div>
+  <div class="table-responsive">
+    <table class="table align-middle">
+      <thead>
+        <tr>
+          <th>ID Number</th>
+          <th>Name</th>
+          <th>Year Level</th>
+          <th>Course</th>
+          <th>Remaining Session</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for student in students %}
+          <tr>
+            <td>{{ student.id_number }}</td>
+            <td>{{ student.name }}</td>
+            <td>{{ student.year_level }}</td>
+            <td>{{ student.course }}</td>
+            <td>{{ student.remaining }}</td>
+            <td class="table-actions">
+              <button class="btn btn-primary btn-sm" type="button">Edit</button>
+              <button class="btn btn-danger btn-sm" type="button">Delete</button>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
