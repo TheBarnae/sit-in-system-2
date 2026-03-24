@@ -255,3 +255,99 @@ body {
 .dot-yellow { background: #ffc107; }
 .dot-green { background: #20c997; }
 .dot-pink { background: #d63384; }
+
+/* Dashboard extras */
+.announcement-card .announcement-item + .announcement-item {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.active-session-card .badge {
+  font-size: 0.75rem;
+  padding: 5px 10px;
+}
+
+.lab-card {
+  background: #fff;
+  border-radius: 14px;
+  padding: 18px;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+  height: 100%;
+  border: 1px solid transparent;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.lab-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 26px rgba(15, 23, 42, 0.16);
+}
+
+.lab-card-full {
+  border-color: #f5c2c7;
+  background: #fff5f5;
+}
+
+.lab-label {
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.lab-desc {
+  font-size: 0.85rem;
+  color: #6c757d;
+}
+
+.lab-capacity {
+  font-size: 0.8rem;
+  color: #adb5bd;
+}
+
+.lab-progress {
+  width: 100%;
+  height: 8px;
+  background: #e9ecef;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.lab-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #0d6efd, #20c997);
+  border-radius: 999px;
+  width: 0;
+  transition: width 0.3s ease;
+}
+
+.lab-status {
+  font-size: 0.9rem;
+  color: #495057;
+}
+
+.lab-card form .btn {
+  font-weight: 600;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.status-pill.status-active {
+  background: rgba(13, 110, 253, 0.15);
+  color: #0d6efd;
+}
+
+.status-pill.status-completed {
+  background: rgba(25, 135, 84, 0.15);
+  color: #198754;
+}
+
+.session-balance-card .display-5 {
+  font-size: 2.5rem;
+}

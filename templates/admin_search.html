@@ -3,17 +3,101 @@
 
 {% block content %}
 <div class="row justify-content-center">
-  <div class="col-md-6">
-    <div class="info-card">
+  <div class="col-lg-6">
+    <div class="info-card mb-4">
       <div class="d-flex justify-content-between align-items-center mb-3">
         <h5 class="mb-0">Search Student</h5>
         <a class="btn-close" href="/admin" aria-label="Close"></a>
       </div>
-      <div class="input-group">
-        <input type="text" class="form-control" placeholder="Search...">
-        <button class="btn btn-primary" type="button">Search</button>
-      </div>
+      <form method="POST" action="{{ url_for('admin_search') }}" class="input-group">
+        <input type="text" class="form-control" name="id_number" placeholder="Enter student ID" value="{{ searched_id or '' }}" required>
+        <button class="btn btn-primary" type="submit">Search</button>
+      </form>
+      <div class="small text-muted mt-2">Search is exact match and ignores admin accounts.</div>
     </div>
+
+    {% if student %}
+      <div class="info-card mb-4">
+        <h5 class="mb-3">Student Details</h5>
+        <table class="table table-borderless mb-0">
+          <tbody>
+            <tr>
+              <th>ID Number</th>
+              <td>{{ student.id_number }}</td>
+            </tr>
+            <tr>
+              <th>Name</th>
+              <td>{{ student.last_name }}, {{ student.first_name }} {{ student.middle_name or '' }}</td>
+            </tr>
+            <tr>
+              <th>Course</th>
+              <td>{{ student.course }}</td>
+            </tr>
+            <tr>
+              <th>Year Level</th>
+              <td>{{ student.course_level }}</td>
+            </tr>
+            {% if remaining_sessions is not none %}
+              <tr>
+                <th>Remaining Sessions</th>
+                <td>{{ remaining_sessions }}</td>
+              </tr>
+            {% endif %}
+            <tr>
+              <th>Current Status</th>
+              <td>
+                {% if active_session %}
+                  <span class="badge bg-success">Sitting in {{ active_session.lab_label }}</span><br>
+                  <small class="text-muted">Started {{ active_session.started_at.strftime('%b %d, %I:%M %p') if active_session.started_at }}</small>
+                  {% if active_session.purpose %}<div class="text-muted">Purpose: {{ active_session.purpose }}</div>{% endif %}
+                {% else %}
+                  <span class="badge bg-secondary">No active sit-in</span>
+                {% endif %}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="info-card">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h5 class="mb-0">Recent Sessions</h5>
+          <small class="text-muted">Last {{ recent_sessions|length }} entries</small>
+        </div>
+        {% if recent_sessions %}
+          <div class="table-responsive">
+            <table class="table align-middle">
+              <thead>
+                <tr>
+                  <th>Lab</th>
+                  <th>Purpose</th>
+                  <th>Status</th>
+                  <th>Started</th>
+                  <th>Ended</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in recent_sessions %}
+                  <tr>
+                    <td>{{ row.lab_label }}</td>
+                    <td>{{ row.purpose or 'General use' }}</td>
+                    <td>
+                      <span class="badge {% if row.status == 'completed' %}bg-success{% else %}bg-primary{% endif %}">{{ row.status | capitalize }}</span>
+                    </td>
+                    <td>{{ row.started_at.strftime('%b %d, %Y %I:%M %p') if row.started_at }}</td>
+                    <td>{{ row.ended_at.strftime('%b %d, %Y %I:%M %p') if row.ended_at else '—' }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <p class="text-muted mb-0">No sit-in history recorded for this student.</p>
+        {% endif %}
+      </div>
+    {% elif searched_id %}
+      <div class="alert alert-warning">No student record found for ID "{{ searched_id }}".</div>
+    {% endif %}
   </div>
 </div>
 {% endblock %}

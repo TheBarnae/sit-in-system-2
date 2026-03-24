@@ -24,6 +24,23 @@ SET time_zone = "+00:00";
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `sit_in_logs`
+--
+
+CREATE TABLE `sit_in_logs` (
+  `id` int(11) NOT NULL,
+  `student_id_number` varchar(20) NOT NULL,
+  `purpose` varchar(100) DEFAULT NULL,
+  `lab` varchar(50) DEFAULT NULL,
+  `session_no` int(11) DEFAULT 1,
+  `status` enum('active','completed') NOT NULL DEFAULT 'active',
+  `started_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `ended_at` datetime DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `users`
 --
 
@@ -55,6 +72,14 @@ INSERT INTO `users` (`id`, `id_number`, `last_name`, `first_name`, `middle_name`
 --
 
 --
+-- Indexes for table `sit_in_logs`
+--
+ALTER TABLE `sit_in_logs`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_student_id_number` (`student_id_number`),
+  ADD KEY `idx_status` (`status`);
+
+--
 -- Indexes for table `users`
 --
 ALTER TABLE `users`
@@ -69,6 +94,12 @@ ALTER TABLE `users`
 --
 ALTER TABLE `users`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+
+--
+-- AUTO_INCREMENT for table `sit_in_logs`
+--
+ALTER TABLE `sit_in_logs`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

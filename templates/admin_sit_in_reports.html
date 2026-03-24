@@ -2,8 +2,103 @@
 {% set title = 'Sit-in Reports | CCS Sit-in Monitoring' %}
 
 {% block content %}
-<div class="info-card">
-  <h5 class="mb-3">Sit-in Reports</h5>
-  <p class="text-muted">This module will display sit-in reports once database wiring is ready.</p>
+<div class="info-card mb-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0">Sit-in Reports</h5>
+    <a class="btn btn-outline-secondary btn-sm" href="/admin/sit-in-reports">Reset filters</a>
+  </div>
+  <form class="row g-3" method="GET" action="{{ url_for('admin_sit_in_reports') }}">
+    <div class="col-sm-6 col-lg-3">
+      <label class="form-label" for="studentIdFilter">Student ID</label>
+      <input type="text" id="studentIdFilter" name="student_id" class="form-control" value="{{ filters.student_id }}" placeholder="e.g. 23802838">
+    </div>
+    <div class="col-sm-6 col-lg-3">
+      <label class="form-label" for="statusFilter">Status</label>
+      <select id="statusFilter" name="status" class="form-select">
+        <option value="all" {% if filters.status == 'all' %}selected{% endif %}>All</option>
+        <option value="active" {% if filters.status == 'active' %}selected{% endif %}>Active</option>
+        <option value="completed" {% if filters.status == 'completed' %}selected{% endif %}>Completed</option>
+      </select>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+      <label class="form-label" for="dateFromFilter">From</label>
+      <input type="date" id="dateFromFilter" name="date_from" class="form-control" value="{{ filters.date_from }}">
+    </div>
+    <div class="col-sm-6 col-lg-3">
+      <label class="form-label" for="dateToFilter">To</label>
+      <input type="date" id="dateToFilter" name="date_to" class="form-control" value="{{ filters.date_to }}">
+    </div>
+    <div class="col-12 d-flex justify-content-end">
+      <button type="submit" class="btn btn-primary">Filter</button>
+    </div>
+  </form>
 </div>
+
+{% if has_history %}
+  <div class="row g-3 mb-4">
+    <div class="col-md-4">
+      <div class="stat-card text-center">
+        <div class="stat-label">Total Records</div>
+        <div class="stat-value">{{ summary.total }}</div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="stat-card text-center">
+        <div class="stat-label">Completed</div>
+        <div class="stat-value text-success">{{ summary.completed }}</div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="stat-card text-center">
+        <div class="stat-label">Active</div>
+        <div class="stat-value text-primary">{{ summary.active }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <h6 class="mb-0">History</h6>
+    <a class="btn btn-success btn-sm" href="{{ url_for('admin_sit_in_reports_pdf') }}{% if filtered_query %}?{{ filtered_query }}{% endif %}">Export PDF</a>
+  </div>
+
+  <div class="info-card">
+    <div class="table-responsive">
+      <table class="table align-middle">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Student</th>
+            <th>Course</th>
+            <th>Lab</th>
+            <th>Purpose</th>
+            <th>Status</th>
+            <th>Started</th>
+            <th>Ended</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in history %}
+            <tr>
+              <td>{{ row.session_no or row.id }}</td>
+              <td>
+                <div class="fw-semibold">{{ row.full_name }}</div>
+                <div class="text-muted small">{{ row.student_id_number }}</div>
+              </td>
+              <td>{{ row.course or '—' }}</td>
+              <td>{{ row.lab_label }}</td>
+              <td>{{ row.purpose or 'General use' }}</td>
+              <td>
+                <span class="badge {% if row.status == 'completed' %}bg-success{% else %}bg-primary{% endif %}">{{ row.status | capitalize }}</span>
+              </td>
+              <td>{{ row.started_at.strftime('%Y-%m-%d %I:%M %p') if row.started_at }}</td>
+              <td>{{ row.ended_at.strftime('%Y-%m-%d %I:%M %p') if row.ended_at }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% else %}
+  <div class="alert alert-info">No sit-in history found for the selected filters.</div>
+{% endif %}
 {% endblock %}

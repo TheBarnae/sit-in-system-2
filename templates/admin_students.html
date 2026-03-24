@@ -6,8 +6,10 @@
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h5 class="mb-0">Students Information</h5>
     <div class="d-flex gap-2">
-      <button class="btn btn-primary btn-sm" type="button">Add Students</button>
-      <button class="btn btn-danger btn-sm" type="button">Reset All Session</button>
+      <a class="btn btn-primary btn-sm" href="{{ url_for('admin_add_student') }}">Add Student</a>
+      <form class="d-inline" action="{{ url_for('admin_reset_sessions') }}" method="POST" onsubmit="return confirm('Reset all student sessions? This clears sit-in logs.');">
+        <button class="btn btn-danger btn-sm" type="submit">Reset All Session</button>
+      </form>
     </div>
   </div>
   <div class="table-responsive">
@@ -31,8 +33,10 @@
             <td>{{ student.course }}</td>
             <td>{{ student.remaining }}</td>
             <td class="table-actions">
-              <button class="btn btn-primary btn-sm" type="button">Edit</button>
-              <button class="btn btn-danger btn-sm" type="button">Delete</button>
+              <a class="btn btn-primary btn-sm" href="{{ url_for('admin_edit_student', id_number=student.id_number) }}">Edit</a>
+              <form action="{{ url_for('admin_delete_student', id_number=student.id_number) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this student account? This cannot be undone.');">
+                <button class="btn btn-danger btn-sm" type="submit">Delete</button>
+              </form>
             </td>
           </tr>
         {% endfor %}
