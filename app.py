@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, session, flash, url_for, send_file
+from flask import Flask, render_template, request, redirect, session, flash, url_for, send_file, jsonify
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 import mysql.connector
@@ -22,6 +22,16 @@ LABS = [
     {'code': 'LAB102', 'label': 'Lab 102', 'description': 'Programming and software dev lab', 'capacity': 20},
     {'code': 'LAB103', 'label': 'Lab 103', 'description': 'Networking and infrastructure lab', 'capacity': 20},
     {'code': 'LAB201', 'label': 'Lab 201', 'description': 'Research and capstone lab', 'capacity': 15},
+]
+
+PURPOSES = [
+    'C',
+    'C#',
+    'Java',
+    'Python',
+    'PHP',
+    'JavaScript',
+    'ASP.Net'
 ]
 
 LAB_LOOKUP = {lab['code']: lab for lab in LABS}
@@ -75,6 +85,30 @@ def ensure_sit_in_logs_table(db):
             PRIMARY KEY (id),
             INDEX idx_student_id_number (student_id_number),
             INDEX idx_status (status)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+    """)
+    cursor.close()
+
+
+def ensure_user_feedback_table(db):
+    cursor = db.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS user_feedback (
+            id INT NOT NULL AUTO_INCREMENT,
+            student_id_number VARCHAR(20) NOT NULL,
+            sit_in_log_id INT DEFAULT NULL,
+            rating TINYINT DEFAULT NULL,
+            feedback_text TEXT NOT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            INDEX idx_student_id_number (student_id_number),
+            INDEX idx_sit_in_log_id (sit_in_log_id),
+            CONSTRAINT fk_user_feedback_student
+                FOREIGN KEY (student_id_number) REFERENCES users(id_number)
+                ON DELETE CASCADE,
+            CONSTRAINT fk_user_feedback_sit_in
+                FOREIGN KEY (sit_in_log_id) REFERENCES sit_in_logs(id)
+                ON DELETE SET NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
     """)
     cursor.close()
@@ -204,6 +238,16 @@ def get_admin_dashboard_data():
     """)
     total_sit_in = cursor.fetchone()['total_sit_in']
 
+    cursor.execute("""
+        SELECT
+            COALESCE(NULLIF(purpose, ''), 'Unspecified') AS label,
+            COUNT(*) AS total
+        FROM sit_in_logs
+        GROUP BY COALESCE(NULLIF(purpose, ''), 'Unspecified')
+        ORDER BY total DESC, label ASC
+    """)
+    purpose_breakdown = cursor.fetchall()
+
     cursor.close()
     db.close()
 
@@ -213,7 +257,50 @@ def get_admin_dashboard_data():
         'total_sit_in': total_sit_in,
     }
 
-    return stats, ANNOUNCEMENTS
+    chart_data = {
+        'labels': [row['label'] for row in purpose_breakdown],
+        'values': [row['total'] for row in purpose_breakdown]
+    }
+
+    return stats, ANNOUNCEMENTS, chart_data
+
+
+def lookup_student_session(cursor, student_id):
+    cursor.execute("""
+        SELECT id_number, last_name, first_name, middle_name, course, course_level
+        FROM users
+        WHERE id_number = %s AND id_number NOT LIKE 'adm-%'
+        LIMIT 1
+    """, (student_id,))
+    student = cursor.fetchone()
+    if not student:
+        return None, None, None, None
+
+    cursor.execute("""
+        SELECT
+            SUM(CASE WHEN status='completed' THEN 1 ELSE 0 END) AS completed_count,
+            SUM(CASE WHEN status='active' THEN 1 ELSE 0 END) AS active_count
+        FROM sit_in_logs
+        WHERE student_id_number=%s
+    """, (student_id,))
+    counts = cursor.fetchone()
+    completed_sessions = counts['completed_count'] or 0
+    active_sessions = counts['active_count'] or 0
+    remaining_sessions = max(TOTAL_SESSION_LIMIT - completed_sessions - active_sessions, 0)
+
+    cursor.execute("""
+        SELECT lab, purpose, started_at
+        FROM sit_in_logs
+        WHERE student_id_number=%s AND status='active'
+        ORDER BY started_at DESC
+        LIMIT 1
+    """, (student_id,))
+    active_session = cursor.fetchone()
+    if active_session:
+        lab_info = LAB_LOOKUP.get(active_session['lab'])
+        active_session['lab_label'] = lab_info['label'] if lab_info else (active_session['lab'] or 'Unassigned')
+
+    return student, remaining_sessions, active_session, completed_sessions
 
 
 @app.route('/')
@@ -226,6 +313,54 @@ def register():
     return render_template('register.html')
 
 
+@app.route('/reset_password', methods=['GET', 'POST'])
+def reset_password():
+    if request.method == 'POST':
+        id_number = (request.form.get('id_number') or '').strip()
+        email = (request.form.get('email') or '').strip()
+        new_password = request.form.get('new_password') or ''
+        confirm_password = request.form.get('confirm_password') or ''
+
+        if not id_number or not email or not new_password or not confirm_password:
+            flash('Please complete all fields.', 'danger')
+            return redirect('/reset_password')
+
+        if new_password != confirm_password:
+            flash('Passwords do not match.', 'danger')
+            return redirect('/reset_password')
+
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT id, id_number
+            FROM users
+            WHERE id_number = %s AND email = %s
+            LIMIT 1
+        """, (id_number, email))
+        user = cursor.fetchone()
+
+        if not user:
+            cursor.close()
+            db.close()
+            flash('Account not found. Check your ID number and email.', 'danger')
+            return redirect('/reset_password')
+
+        hashed_pw = generate_password_hash(new_password)
+        cursor.execute("""
+            UPDATE users
+            SET password = %s
+            WHERE id = %s
+        """, (hashed_pw, user['id']))
+        db.commit()
+        cursor.close()
+        db.close()
+
+        flash('Password reset successful. Please log in.', 'success')
+        return redirect('/')
+
+    return render_template('reset_password.html')
+
+
 @app.route('/about')
 def about():
     return render_template('about.html')
@@ -233,10 +368,11 @@ def about():
 
 @app.route('/admin')
 def admin_dashboard():
-    stats, announcements = get_admin_dashboard_data()
+    stats, announcements, chart_data = get_admin_dashboard_data()
     return render_template('admin_dashboard.html',
                            stats=stats,
-                           announcements=announcements)
+                           announcements=announcements,
+                           chart_data=chart_data)
 
 
 @app.route('/admin/search', methods=['GET', 'POST'])
@@ -438,9 +574,130 @@ def admin_reset_sessions():
     return redirect('/admin/students')
 
 
-@app.route('/admin/sit-in')
+@app.route('/admin/sit-in', methods=['GET', 'POST'])
 def admin_sit_in():
-    return render_template('admin_sit_in.html')
+    if not is_admin_user():
+        flash('Please log in as admin.', 'danger')
+        return redirect('/')
+
+    searched_id = ''
+    student = None
+    remaining_sessions = None
+    active_session = None
+
+    selected_purpose = ''
+
+    if request.method == 'POST':
+        searched_id = (request.form.get('id_number') or '').strip()
+        lab_code = (request.form.get('lab_code') or '').strip()
+        purpose = (request.form.get('purpose') or '').strip()
+        selected_purpose = purpose
+
+        if not searched_id:
+            flash('Please enter a student ID.', 'warning')
+        else:
+            db = get_db()
+            ensure_sit_in_logs_table(db)
+            cursor = db.cursor(dictionary=True)
+
+            student, remaining_sessions, active_session, completed_sessions = lookup_student_session(cursor, searched_id)
+
+            if not student:
+                flash('Student not found.', 'danger')
+            elif active_session:
+                flash('Student already has an active sit-in session.', 'warning')
+            elif remaining_sessions <= 0:
+                flash('Student has no remaining sessions.', 'warning')
+            else:
+                lab_info = LAB_LOOKUP.get(lab_code)
+                if not lab_info:
+                    flash('Please select a valid lab.', 'warning')
+                else:
+                    cursor.execute("""
+                        SELECT COUNT(*) AS lab_taken
+                        FROM sit_in_logs
+                        WHERE lab=%s AND status='active'
+                    """, (lab_code,))
+                    lab_taken = cursor.fetchone()['lab_taken']
+
+                    if lab_taken >= lab_info['capacity']:
+                        flash(f"{lab_info['label']} is currently full.", 'warning')
+                    else:
+                        purpose_value = purpose if purpose else 'General use'
+                        cursor.execute("""
+                            INSERT INTO sit_in_logs (student_id_number, purpose, lab, session_no, status)
+                            VALUES (%s, %s, %s, %s, 'active')
+                        """, (searched_id, purpose_value, lab_code, completed_sessions + 1))
+                        db.commit()
+                        cursor.close()
+                        db.close()
+                        flash('Sit-in session started for student.', 'success')
+                        return redirect(f"/admin/sit-in?id_number={searched_id}")
+
+            cursor.close()
+            db.close()
+    else:
+        searched_id = (request.args.get('id_number') or '').strip()
+        if searched_id:
+            db = get_db()
+            ensure_sit_in_logs_table(db)
+            cursor = db.cursor(dictionary=True)
+            student, remaining_sessions, active_session, _ = lookup_student_session(cursor, searched_id)
+            cursor.close()
+            db.close()
+
+    student_name = ''
+    if student:
+        student_name = f"{student['last_name']}, {student['first_name']}"
+        if student.get('middle_name'):
+            student_name = f"{student_name} {student['middle_name']}"
+
+    return render_template('admin_sit_in.html',
+                           labs=LABS,
+                           purposes=PURPOSES,
+                           searched_id=searched_id,
+                           student=student,
+                           student_name=student_name,
+                           remaining_sessions=remaining_sessions,
+                           active_session=active_session,
+                           selected_purpose=selected_purpose)
+
+
+@app.route('/admin/sit-in/lookup')
+def admin_sit_in_lookup():
+    if not is_admin_user():
+        return jsonify({'found': False, 'message': 'Unauthorized.'}), 403
+
+    student_id = (request.args.get('id_number') or '').strip()
+    if not student_id:
+        return jsonify({'found': False, 'message': 'Please enter a student ID.'}), 400
+
+    db = get_db()
+    ensure_sit_in_logs_table(db)
+    cursor = db.cursor(dictionary=True)
+
+    student, remaining_sessions, active_session, _ = lookup_student_session(cursor, student_id)
+    cursor.close()
+    db.close()
+
+    if not student:
+        return jsonify({'found': False, 'message': 'Student not found.'})
+
+    full_name = f"{student['last_name']}, {student['first_name']}"
+    if student.get('middle_name'):
+        full_name = f"{full_name} {student['middle_name']}"
+
+    return jsonify({
+        'found': True,
+        'student': {
+            'id_number': student['id_number'],
+            'full_name': full_name,
+            'course': student['course'],
+            'course_level': student['course_level']
+        },
+        'remaining_sessions': remaining_sessions,
+        'active_session': active_session
+    })
 
 
 @app.route('/admin/sit-in-records')
@@ -597,7 +854,48 @@ def admin_sit_in_reports():
 
 @app.route('/admin/feedback-reports')
 def admin_feedback_reports():
-    return render_template('admin_feedback_reports.html')
+    if not is_admin_user():
+        flash('Please log in as admin.', 'danger')
+        return redirect('/')
+
+    db = get_db()
+    ensure_user_feedback_table(db)
+    cursor = db.cursor(dictionary=True)
+    cursor.execute("""
+        SELECT
+            f.id,
+            f.rating,
+            f.feedback_text,
+            f.created_at,
+            u.id_number,
+            u.last_name,
+            u.first_name,
+            u.middle_name,
+            u.course,
+            u.course_level,
+            s.lab,
+            s.purpose,
+            s.started_at,
+            s.ended_at
+        FROM user_feedback f
+        LEFT JOIN users u ON u.id_number = f.student_id_number
+        LEFT JOIN sit_in_logs s ON s.id = f.sit_in_log_id
+        ORDER BY f.created_at DESC
+    """)
+    feedback_rows = cursor.fetchall()
+    cursor.close()
+    db.close()
+
+    for row in feedback_rows:
+        full_name = f"{row.get('last_name') or ''}, {row.get('first_name') or ''}"
+        if row.get('middle_name'):
+            full_name = f"{full_name} {row['middle_name']}"
+        row['full_name'] = full_name.strip(', ')
+
+        lab_info = LAB_LOOKUP.get(row['lab'])
+        row['lab_label'] = lab_info['label'] if lab_info else (row['lab'] or 'Unassigned')
+
+    return render_template('admin_feedback_reports.html', feedback_rows=feedback_rows)
 
 
 @app.route('/admin/sit-in-reports/pdf')
@@ -736,6 +1034,8 @@ def login_user():
             'address': user['address'] or '',
             'photo_path': user.get('photo_path') or '',
         }
+        display_name = user.get('first_name') or 'User'
+        flash(f"Welcome back, {display_name}!", 'success')
         if user['id_number'].lower().startswith('adm-'):
             return redirect('/admin')
         return redirect('/dashboard')
@@ -794,6 +1094,7 @@ def dashboard():
     user = session['user']
     db = get_db()
     ensure_sit_in_logs_table(db)
+    ensure_user_feedback_table(db)
     cursor = db.cursor(dictionary=True)
 
     cursor.execute("""
@@ -821,10 +1122,18 @@ def dashboard():
     lab_counts = {row['lab']: row['taken'] for row in cursor.fetchall()}
 
     cursor.execute("""
-        SELECT lab, purpose, status, started_at, ended_at
-        FROM sit_in_logs
-        WHERE student_id_number=%s
-        ORDER BY started_at DESC
+        SELECT
+            s.id,
+            s.lab,
+            s.purpose,
+            s.status,
+            s.started_at,
+            s.ended_at,
+            f.id AS feedback_id
+        FROM sit_in_logs s
+        LEFT JOIN user_feedback f ON f.sit_in_log_id = s.id
+        WHERE s.student_id_number=%s
+        ORDER BY s.started_at DESC
         LIMIT 5
     """, (user['id_number'],))
     recent_sessions = cursor.fetchall()
@@ -867,6 +1176,80 @@ def dashboard():
                            announcements=ANNOUNCEMENTS,
                            recent_sessions=recent_sessions,
                            can_start_session=can_start_session)
+
+
+@app.route('/feedback/submit', methods=['POST'])
+def submit_feedback():
+    if 'user' not in session:
+        return redirect('/')
+
+    user = session['user']
+    sit_in_log_id = request.form.get('sit_in_log_id')
+    rating_value = request.form.get('rating')
+    feedback_text = (request.form.get('feedback_text') or '').strip()
+
+    if not sit_in_log_id or not feedback_text:
+        flash('Please provide feedback before submitting.', 'warning')
+        return redirect('/dashboard')
+
+    try:
+        sit_in_log_id = int(sit_in_log_id)
+    except (TypeError, ValueError):
+        flash('Invalid session selected for feedback.', 'danger')
+        return redirect('/dashboard')
+
+    rating = None
+    if rating_value:
+        try:
+            rating = int(rating_value)
+        except ValueError:
+            flash('Rating must be a number between 1 and 5.', 'danger')
+            return redirect('/dashboard')
+        if rating < 1 or rating > 5:
+            flash('Rating must be between 1 and 5.', 'danger')
+            return redirect('/dashboard')
+
+    db = get_db()
+    ensure_sit_in_logs_table(db)
+    ensure_user_feedback_table(db)
+    cursor = db.cursor(dictionary=True)
+
+    cursor.execute("""
+        SELECT id, status
+        FROM sit_in_logs
+        WHERE id=%s AND student_id_number=%s
+        LIMIT 1
+    """, (sit_in_log_id, user['id_number']))
+    session_row = cursor.fetchone()
+
+    if not session_row or session_row['status'] != 'completed':
+        cursor.close()
+        db.close()
+        flash('Feedback is only available for completed sessions.', 'warning')
+        return redirect('/dashboard')
+
+    cursor.execute("""
+        SELECT id
+        FROM user_feedback
+        WHERE sit_in_log_id=%s AND student_id_number=%s
+        LIMIT 1
+    """, (sit_in_log_id, user['id_number']))
+    if cursor.fetchone():
+        cursor.close()
+        db.close()
+        flash('Feedback already submitted for this session.', 'info')
+        return redirect('/dashboard')
+
+    cursor.execute("""
+        INSERT INTO user_feedback (student_id_number, sit_in_log_id, rating, feedback_text)
+        VALUES (%s, %s, %s, %s)
+    """, (user['id_number'], sit_in_log_id, rating, feedback_text))
+    db.commit()
+    cursor.close()
+    db.close()
+
+    flash('Thank you for your feedback!', 'success')
+    return redirect('/dashboard')
 
 
 @app.route('/sit_in/start', methods=['POST'])

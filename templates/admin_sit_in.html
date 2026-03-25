@@ -9,33 +9,139 @@
         <h5 class="mb-0">Sit-in Form</h5>
         <a class="btn-close" href="/admin" aria-label="Close"></a>
       </div>
-      <form>
+      <form method="POST" action="/admin/sit-in" id="sitInForm" data-initial-active="{{ 1 if active_session else 0 }}" data-initial-remaining="{% if remaining_sessions is not none %}{{ remaining_sessions }}{% endif %}">
         <div class="mb-3">
           <label class="form-label">ID Number</label>
-          <input type="text" class="form-control" placeholder="ID Number">
+          <input type="text" class="form-control" name="id_number" id="idNumber" placeholder="ID Number" value="{{ searched_id or '' }}" autocomplete="off">
         </div>
         <div class="mb-3">
           <label class="form-label">Student Name</label>
-          <input type="text" class="form-control" placeholder="Student Name">
+          <input type="text" class="form-control" id="studentName" placeholder="Student Name" value="{{ student_name or '' }}" readonly>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Course / Year</label>
+          <input type="text" class="form-control" id="courseInfo" placeholder="Course / Year" value="{% if student %}{{ student.course }} - {{ student.course_level }}{% endif %}" readonly>
         </div>
         <div class="mb-3">
           <label class="form-label">Purpose</label>
-          <input type="text" class="form-control" placeholder="Purpose">
+          <select class="form-select" name="purpose" id="purpose" required>
+            <option value="">Select a purpose</option>
+            {% for item in purposes %}
+            <option value="{{ item }}" {% if item == selected_purpose %}selected{% endif %}>{{ item }}</option>
+            {% endfor %}
+          </select>
         </div>
         <div class="mb-3">
           <label class="form-label">Lab</label>
-          <input type="text" class="form-control" placeholder="Lab">
+          <select class="form-select" name="lab_code" id="labCode" required>
+            <option value="">Select a lab</option>
+            {% for lab in labs %}
+            <option value="{{ lab.code }}">{{ lab.label }} ({{ lab.description }})</option>
+            {% endfor %}
+          </select>
         </div>
         <div class="mb-3">
           <label class="form-label">Remaining Session</label>
-          <input type="text" class="form-control" placeholder="Remaining Session">
+          <input type="text" class="form-control" id="remainingSessions" placeholder="Remaining Session" value="{% if remaining_sessions is not none %}{{ remaining_sessions }}{% endif %}" readonly>
         </div>
+        <div class="alert alert-info d-none" id="lookupMessage"></div>
         <div class="d-flex justify-content-end gap-2">
           <a href="/admin" class="btn btn-secondary">Close</a>
-          <button type="button" class="btn btn-primary">Sit In</button>
+          <button type="submit" class="btn btn-primary" id="sitInSubmit">Sit In</button>
         </div>
       </form>
     </div>
   </div>
 </div>
+
+<script>
+  const form = document.getElementById('sitInForm');
+  const idInput = document.getElementById('idNumber');
+  const nameInput = document.getElementById('studentName');
+  const courseInput = document.getElementById('courseInfo');
+  const remainingInput = document.getElementById('remainingSessions');
+  const submitButton = document.getElementById('sitInSubmit');
+  const messageBox = document.getElementById('lookupMessage');
+
+  const initialActive = form.dataset.initialActive === '1';
+  const initialRemaining = form.dataset.initialRemaining === '' ? null : Number(form.dataset.initialRemaining);
+  if (!idInput.value.trim() || initialActive || initialRemaining === 0) {
+    submitButton.disabled = true;
+  }
+
+  function setMessage(text, type) {
+    if (!text) {
+      messageBox.classList.add('d-none');
+      messageBox.textContent = '';
+      return;
+    }
+    messageBox.className = `alert alert-${type}`;
+    messageBox.textContent = text;
+  }
+
+  function resetFields() {
+    nameInput.value = '';
+    courseInput.value = '';
+    remainingInput.value = '';
+  }
+
+  async function lookupStudent(idNumber) {
+    if (!idNumber) {
+      resetFields();
+      setMessage('', 'info');
+      submitButton.disabled = true;
+      return;
+    }
+
+    try {
+      const response = await fetch(`/admin/sit-in/lookup?id_number=${encodeURIComponent(idNumber)}`);
+      if (!response.ok) {
+        setMessage('Unable to look up student.', 'warning');
+        submitButton.disabled = true;
+        return;
+      }
+      const data = await response.json();
+      if (!data.found) {
+        resetFields();
+        setMessage(data.message || 'Student not found.', 'danger');
+        submitButton.disabled = true;
+        return;
+      }
+
+      nameInput.value = data.student.full_name || '';
+      courseInput.value = [data.student.course, data.student.course_level].filter(Boolean).join(' - ');
+      remainingInput.value = data.remaining_sessions;
+
+      if (data.active_session) {
+        setMessage(`Student already has an active sit-in (${data.active_session.lab_label}).`, 'warning');
+        submitButton.disabled = true;
+        return;
+      }
+
+      if (data.remaining_sessions <= 0) {
+        setMessage('No remaining sessions available.', 'warning');
+        submitButton.disabled = true;
+        return;
+      }
+
+      setMessage('', 'info');
+      submitButton.disabled = false;
+    } catch (error) {
+      setMessage('Unable to look up student.', 'warning');
+      submitButton.disabled = true;
+    }
+  }
+
+  let lookupTimer = null;
+  idInput.addEventListener('input', () => {
+    clearTimeout(lookupTimer);
+    lookupTimer = setTimeout(() => {
+      lookupStudent(idInput.value.trim());
+    }, 350);
+  });
+
+  if (idInput.value.trim()) {
+    lookupStudent(idInput.value.trim());
+  }
+</script>
 {% endblock %}

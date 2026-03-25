@@ -28,17 +28,10 @@
     <div class="info-card">
       <div class="d-flex align-items-center justify-content-between mb-3">
         <h5 class="mb-0">Statistics</h5>
-        <span class="text-muted small">Program breakdown</span>
+        <span class="text-muted small">Purpose breakdown</span>
       </div>
       <div class="chart-placeholder">
-        <div class="chart-legend">
-          <span class="legend-dot dot-blue"></span> C#
-          <span class="legend-dot dot-orange"></span> C
-          <span class="legend-dot dot-yellow"></span> Java
-          <span class="legend-dot dot-green"></span> ASP.Net
-          <span class="legend-dot dot-pink"></span> PHP
-        </div>
-        <div class="chart-hole">Chart Area</div>
+        <canvas id="purposeChart" height="240" data-labels='{{ chart_data["labels"] | tojson }}' data-values='{{ chart_data["values"] | tojson }}'></canvas>
       </div>
     </div>
   </div>
@@ -60,4 +53,30 @@
     </div>
   </div>
 </div>
+{% endblock %}
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+  const chartCanvas = document.getElementById('purposeChart');
+  const chartLabels = chartCanvas ? JSON.parse(chartCanvas.dataset.labels || '[]') : [];
+  const chartValues = chartCanvas ? JSON.parse(chartCanvas.dataset.values || '[]') : [];
+
+  if (chartCanvas && chartLabels.length) {
+    new Chart(chartCanvas, {
+      type: 'doughnut',
+      data: {
+        labels: chartLabels,
+        datasets: [{
+          data: chartValues,
+          backgroundColor: ['#1e88e5', '#f4511e', '#fdd835', '#43a047', '#8e24aa', '#00acc1', '#fb8c00']
+        }]
+      },
+      options: {
+        plugins: {
+          legend: { position: 'bottom' }
+        }
+      }
+    });
+  }
+</script>
 {% endblock %}
