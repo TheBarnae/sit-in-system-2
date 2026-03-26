@@ -1012,7 +1012,7 @@ def admin_reservations():
 
 @app.route('/login_user', methods=['POST'])
 def login_user():
-    id_number = request.form['id_number']
+    id_number = (request.form.get('id_number') or '').strip()
     password = request.form['password']
 
     db = get_db()
@@ -1056,6 +1056,10 @@ def register_user():
     address = request.form['address']
     password = request.form['password']
     confirm_password = request.form['confirm_password']
+
+    if not id_number.isdigit():
+        flash('Only numeric values are accepted for ID number.', 'danger')
+        return redirect('/register')
 
     if password != confirm_password:
         flash('Passwords do not match.', 'danger')
@@ -1451,5 +1455,5 @@ def edit_profile():
     return render_template('edit_profile.html', user=user)
 
 
-if __name__ == '__main__':
-    app.run(debug=True)
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000, debug=True)
