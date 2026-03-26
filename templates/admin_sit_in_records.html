@@ -28,9 +28,15 @@
               <td>{{ sitin.purpose }}</td>
               <td>{{ sitin.lab }}</td>
               <td>{{ sitin.session }}</td>
-              <td>{{ sitin.status }}</td>
+              <td>
+                <span class="status-pill status-{{ sitin.status | lower }}">
+                  {{ sitin.status | capitalize }}
+                </span>
+              </td>
               <td class="table-actions">
-                <button class="btn btn-primary btn-sm" type="button">View</button>
+                <form action="{{ url_for('admin_complete_sit_in', sit_in_id=sitin.sit_id) }}" method="post" class="d-inline">
+                  <button class="btn btn-danger btn-sm" type="submit" onclick="return confirm('Time out this session?');">Time Out</button>
+                </form>
               </td>
             </tr>
           {% endfor %}

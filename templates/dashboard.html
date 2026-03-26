@@ -156,13 +156,13 @@
                         <form class="row g-2" method="POST" action="/feedback/submit">
                           <input type="hidden" name="sit_in_log_id" value="{{ session_item.id }}">
                           <div class="col-md-3">
-                            <select class="form-select" name="rating">
-                              <option value="">Rating (optional)</option>
-                              <option value="5">5 - Excellent</option>
-                              <option value="4">4 - Good</option>
-                              <option value="3">3 - Okay</option>
-                              <option value="2">2 - Poor</option>
+                            <select class="form-select" name="rating" required>
+                              <option value="" selected disabled>Select rating (1-5)</option>
                               <option value="1">1 - Bad</option>
+                              <option value="2">2 - Poor</option>
+                              <option value="3">3 - Okay</option>
+                              <option value="4">4 - Good</option>
+                              <option value="5">5 - Excellent</option>
                             </select>
                           </div>
                           <div class="col-md-7">

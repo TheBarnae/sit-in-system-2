@@ -734,6 +734,42 @@ def admin_sit_in_records():
     return render_template('admin_sit_in_records.html', current_sitins=current_sitins)
 
 
+@app.route('/admin/sit-in/<int:sit_in_id>/complete', methods=['POST'])
+def admin_complete_sit_in(sit_in_id):
+    if not is_admin_user():
+        flash('Please log in as admin.', 'danger')
+        return redirect('/')
+
+    db = get_db()
+    ensure_sit_in_logs_table(db)
+    cursor = db.cursor(dictionary=True)
+
+    cursor.execute("""
+        SELECT id, status
+        FROM sit_in_logs
+        WHERE id=%s
+        LIMIT 1
+    """, (sit_in_id,))
+    record = cursor.fetchone()
+
+    if not record:
+        flash('Sit-in session not found.', 'warning')
+    elif record['status'] != 'active':
+        flash('Sit-in session is already completed.', 'info')
+    else:
+        cursor.execute("""
+            UPDATE sit_in_logs
+            SET status='completed', ended_at=NOW()
+            WHERE id=%s
+        """, (sit_in_id,))
+        db.commit()
+        flash('Sit-in session ended successfully.', 'success')
+
+    cursor.close()
+    db.close()
+    return redirect(url_for('admin_sit_in_records'))
+
+
 @app.route('/admin/students/<id_number>/edit', methods=['GET', 'POST'])
 def admin_edit_student(id_number):
     if not is_admin_user():
@@ -1202,16 +1238,19 @@ def submit_feedback():
         flash('Invalid session selected for feedback.', 'danger')
         return redirect('/dashboard')
 
-    rating = None
-    if rating_value:
-        try:
-            rating = int(rating_value)
-        except ValueError:
-            flash('Rating must be a number between 1 and 5.', 'danger')
-            return redirect('/dashboard')
-        if rating < 1 or rating > 5:
-            flash('Rating must be between 1 and 5.', 'danger')
-            return redirect('/dashboard')
+    if not rating_value:
+        flash('Please select a rating from 1 to 5.', 'warning')
+        return redirect('/dashboard')
+
+    try:
+        rating = int(rating_value)
+    except ValueError:
+        flash('Rating must be a number between 1 and 5.', 'danger')
+        return redirect('/dashboard')
+
+    if rating < 1 or rating > 5:
+        flash('Rating must be between 1 and 5.', 'danger')
+        return redirect('/dashboard')
 
     db = get_db()
     ensure_sit_in_logs_table(db)
@@ -1364,20 +1403,6 @@ def end_sit_in():
 
 @app.route('/logout')
 def logout():
-    user = session.get('user')
-    if user and not str(user.get('id_number', '')).lower().startswith('adm-'):
-        db = get_db()
-        ensure_sit_in_logs_table(db)
-        cursor = db.cursor()
-        cursor.execute("""
-            UPDATE sit_in_logs
-            SET status='completed', ended_at=NOW()
-            WHERE student_id_number=%s AND status='active'
-        """, (user['id_number'],))
-        db.commit()
-        cursor.close()
-        db.close()
-
     session.pop('user', None)
     return redirect('/')
 
