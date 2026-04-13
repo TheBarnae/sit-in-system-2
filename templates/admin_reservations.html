@@ -2,8 +2,124 @@
 {% set title = 'Reservations | CCS Sit-in Monitoring' %}
 
 {% block content %}
-<div class="info-card">
-  <h5 class="mb-3">Reservation</h5>
-  <p class="text-muted">This module will display reservations once database wiring is ready.</p>
+<div class="row g-4">
+  <div class="col-lg-5">
+    <div class="info-card h-100">
+      <h5 class="mb-3">PC Seat Panel</h5>
+      <form class="row g-2 mb-3" method="GET" action="/admin/reservations">
+        <div class="col-12">
+          <label class="form-label mb-1">Laboratory</label>
+          <select class="form-select" name="lab_code" onchange="this.form.submit()">
+            {% for lab in labs %}
+              <option value="{{ lab.code }}" {% if lab.code == selected_lab %}selected{% endif %}>{{ lab.label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-6">
+          <label class="form-label mb-1">Date</label>
+          <input class="form-control" type="date" name="reservation_date" value="{{ selected_date }}" onchange="this.form.submit()">
+        </div>
+        <div class="col-6">
+          <label class="form-label mb-1">Time Slot</label>
+          <select class="form-select" name="reservation_slot" onchange="this.form.submit()">
+            {% for slot in slots %}
+              <option value="{{ slot }}" {% if slot == selected_slot %}selected{% endif %}>{{ slot }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </form>
+
+      <div class="seat-legend mb-2">
+        <span class="seat-badge seat-available"></span> Available
+        <span class="seat-badge seat-taken ms-3"></span> Taken
+      </div>
+
+      <div class="seat-grid">
+        {% for seat in seats %}
+          {% if seat.can_toggle %}
+            <form method="POST" action="/admin/reservations/seat/toggle" class="m-0">
+              <input type="hidden" name="lab_code" value="{{ selected_lab }}">
+              <input type="hidden" name="reservation_date" value="{{ selected_date }}">
+              <input type="hidden" name="reservation_slot" value="{{ selected_slot }}">
+              <input type="hidden" name="seat_no" value="{{ seat.seat_no }}">
+              <button type="submit" class="seat-chip seat-chip-btn {% if seat.is_taken %}seat-chip-taken{% else %}seat-chip-available{% endif %}" title="{{ seat.toggle_label }}">
+                PC {{ seat.seat_no }}
+              </button>
+            </form>
+          {% else %}
+            <div class="seat-chip {% if seat.is_taken %}seat-chip-taken{% else %}seat-chip-available{% endif %}" title="Reserved by student request">
+              PC {{ seat.seat_no }}
+            </div>
+          {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-7">
+    <div class="info-card">
+      <h5 class="mb-3">Reservation Requests</h5>
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead>
+            <tr>
+              <th>Student Name</th>
+              <th>Lab / PC / Purpose</th>
+              <th>Reservation Logs</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% if reservations %}
+              {% for row in reservations %}
+                <tr>
+                  <td>
+                    <div class="fw-semibold">{{ row.student_name or '-' }}</div>
+                    <div class="text-muted small">{{ row.student_id_number }}</div>
+                  </td>
+                  <td>
+                    <div>{{ row.lab_label }} | PC {{ row.seat_no }}</div>
+                    <div class="small text-muted">Purpose: {{ row.purpose or 'General use' }}</div>
+                    {% if row.status == 'pending' %}
+                      <form class="mt-2 d-flex flex-column gap-2" method="POST" action="/admin/reservations/{{ row.id }}/decision">
+                        <input class="form-control form-control-sm" type="text" name="admin_note" placeholder="Reason for denial (required when denying)">
+                        <div class="d-flex gap-2">
+                          <button class="btn btn-sm btn-success" type="submit" name="decision" value="approved" onclick="this.form.admin_note.required = false;">Approve</button>
+                          <button class="btn btn-sm btn-danger" type="submit" name="decision" value="denied" onclick="this.form.admin_note.required = true;">Deny</button>
+                        </div>
+                      </form>
+                    {% elif row.status == 'approved' %}
+                      <form class="mt-2 d-flex flex-column gap-2" method="POST" action="/admin/reservations/{{ row.id }}/decision">
+                        <input class="form-control form-control-sm" type="text" name="admin_note" placeholder="No-show reason (required for no-show)">
+                        <div class="d-flex gap-2">
+                          <button class="btn btn-sm btn-primary" type="submit" name="decision" value="checked_in" onclick="this.form.admin_note.required = false;">Check In</button>
+                          <button class="btn btn-sm btn-outline-danger" type="submit" name="decision" value="no_show" onclick="this.form.admin_note.required = true;">No-Show</button>
+                        </div>
+                      </form>
+                    {% else %}
+                      <span class="badge text-bg-secondary mt-2">{{ row.status|capitalize }}</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <div class="small">Requested: {{ row.created_at.strftime('%b %d, %Y %I:%M %p') if row.created_at }}</div>
+                    <div class="small">Date: {{ row.reservation_date.strftime('%b %d, %Y') if row.reservation_date }} | {{ row.reservation_slot }}</div>
+                    {% if row.decided_at %}
+                      <div class="small">Updated: {{ row.decided_at.strftime('%b %d, %Y %I:%M %p') }}</div>
+                    {% endif %}
+                    {% if row.admin_note %}
+                      <div class="small text-muted">Note: {{ row.admin_note }}</div>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+            {% else %}
+              <tr>
+                <td colspan="3" class="text-center text-muted">No reservation requests yet.</td>
+              </tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 </div>
 {% endblock %}

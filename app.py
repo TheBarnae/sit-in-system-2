@@ -18,10 +18,19 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 TOTAL_SESSION_LIMIT = 30
 
 LABS = [
-    {'code': 'LAB101', 'label': 'Lab 101', 'description': 'Multimedia & design lab', 'capacity': 20},
-    {'code': 'LAB102', 'label': 'Lab 102', 'description': 'Programming and software dev lab', 'capacity': 20},
-    {'code': 'LAB103', 'label': 'Lab 103', 'description': 'Networking and infrastructure lab', 'capacity': 20},
-    {'code': 'LAB201', 'label': 'Lab 201', 'description': 'Research and capstone lab', 'capacity': 15},
+    {'code': 'LAB524', 'label': 'Laboratory 524', 'description': 'Main programming laboratory', 'capacity': 50},
+    {'code': 'LAB526', 'label': 'Laboratory 526', 'description': 'Software development laboratory', 'capacity': 50},
+    {'code': 'LAB528', 'label': 'Laboratory 528', 'description': 'Systems and networking laboratory', 'capacity': 50},
+    {'code': 'LAB530', 'label': 'Laboratory 530', 'description': 'Capstone and research laboratory', 'capacity': 50},
+]
+
+RESERVATION_SLOTS = [
+    '07:30-09:00',
+    '09:00-10:30',
+    '10:30-12:00',
+    '13:00-14:30',
+    '14:30-16:00',
+    '16:00-17:30'
 ]
 
 PURPOSES = [
@@ -33,6 +42,8 @@ PURPOSES = [
     'JavaScript',
     'ASP.Net'
 ]
+
+ADMIN_SEAT_BLOCK_ID = 'admin-seat-block'
 
 LAB_LOOKUP = {lab['code']: lab for lab in LABS}
 
@@ -112,6 +123,151 @@ def ensure_user_feedback_table(db):
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
     """)
     cursor.close()
+
+
+def ensure_announcements_table(db):
+    cursor = db.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS announcements (
+            id INT NOT NULL AUTO_INCREMENT,
+            author VARCHAR(100) NOT NULL,
+            body TEXT NOT NULL,
+            created_by_id VARCHAR(20) DEFAULT NULL,
+            status ENUM('active', 'archived') NOT NULL DEFAULT 'active',
+            pinned TINYINT(1) NOT NULL DEFAULT 0,
+            target_course VARCHAR(50) DEFAULT NULL,
+            target_level VARCHAR(20) DEFAULT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            INDEX idx_announcements_status (status),
+            INDEX idx_announcements_created_at (created_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+    """)
+
+    # Backward-compatible column creation for existing databases.
+    alter_statements = [
+        "ALTER TABLE announcements ADD COLUMN pinned TINYINT(1) NOT NULL DEFAULT 0",
+        "ALTER TABLE announcements ADD COLUMN target_course VARCHAR(50) DEFAULT NULL",
+        "ALTER TABLE announcements ADD COLUMN target_level VARCHAR(20) DEFAULT NULL",
+    ]
+    for stmt in alter_statements:
+        try:
+            cursor.execute(stmt)
+        except mysql.connector.Error:
+            pass
+
+    cursor.close()
+
+
+def ensure_reservations_table(db):
+    cursor = db.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS reservations (
+            id INT NOT NULL AUTO_INCREMENT,
+            student_id_number VARCHAR(20) NOT NULL,
+            lab_code VARCHAR(20) NOT NULL,
+            seat_no INT NOT NULL,
+            purpose VARCHAR(100) DEFAULT NULL,
+            reservation_date DATE NOT NULL,
+            reservation_slot VARCHAR(20) NOT NULL,
+            status ENUM('pending', 'approved', 'checked_in', 'denied', 'cancelled', 'no_show') NOT NULL DEFAULT 'pending',
+            admin_note VARCHAR(255) DEFAULT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            decided_at DATETIME DEFAULT NULL,
+            decided_by VARCHAR(20) DEFAULT NULL,
+            PRIMARY KEY (id),
+            INDEX idx_reservation_student (student_id_number),
+            INDEX idx_reservation_lab_date_slot (lab_code, reservation_date, reservation_slot),
+            INDEX idx_reservation_status (status)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+    """)
+
+    # Backward-compatible status expansion for existing databases.
+    try:
+        cursor.execute("""
+            ALTER TABLE reservations
+            MODIFY COLUMN status ENUM('pending', 'approved', 'checked_in', 'denied', 'cancelled', 'no_show')
+            NOT NULL DEFAULT 'pending'
+        """)
+    except mysql.connector.Error:
+        pass
+
+    cursor.close()
+
+
+def get_taken_seats(cursor, lab_code, reservation_date, reservation_slot):
+    cursor.execute("""
+        SELECT seat_no
+        FROM reservations
+        WHERE lab_code=%s
+          AND reservation_date=%s
+          AND reservation_slot=%s
+            AND status IN ('pending', 'approved', 'checked_in')
+    """, (lab_code, reservation_date, reservation_slot))
+    return {row['seat_no'] for row in cursor.fetchall()}
+
+
+def get_session_usage(cursor, student_id_number):
+    cursor.execute("""
+        SELECT
+            SUM(CASE WHEN status='completed' THEN 1 ELSE 0 END) AS completed_count,
+            SUM(CASE WHEN status='active' THEN 1 ELSE 0 END) AS active_count
+        FROM sit_in_logs
+        WHERE student_id_number=%s
+    """, (student_id_number,))
+    sit_in_counts = cursor.fetchone() or {}
+    completed_count = sit_in_counts.get('completed_count') or 0
+    active_count = sit_in_counts.get('active_count') or 0
+
+    sessions_used = completed_count
+    remaining_sessions = max(TOTAL_SESSION_LIMIT - sessions_used - active_count, 0)
+
+    return {
+        'completed': completed_count,
+        'active': active_count,
+        'used': sessions_used,
+        'remaining': remaining_sessions,
+    }
+
+
+def fetch_announcements(limit=10, for_user=None):
+    db = get_db()
+    ensure_announcements_table(db)
+    cursor = db.cursor(dictionary=True)
+    safe_limit = max(1, min(int(limit), 50))
+
+    query = """
+        SELECT id, author, body, created_at, pinned, target_course, target_level
+        FROM announcements
+        WHERE status='active'
+    """
+    params = []
+    if for_user and not str(for_user.get('id_number', '')).lower().startswith('adm-'):
+        query += """
+            AND (target_course IS NULL OR target_course='' OR target_course=%s)
+            AND (target_level IS NULL OR target_level='' OR target_level=%s)
+        """
+        params.extend([(for_user.get('course') or '').strip(), str(for_user.get('course_level') or '').strip()])
+
+    query += f" ORDER BY pinned DESC, created_at DESC LIMIT {safe_limit}"
+    cursor.execute(query, params)
+    rows = cursor.fetchall()
+    cursor.close()
+    db.close()
+
+    announcements = []
+    for row in rows:
+        created_at = row.get('created_at')
+        announcements.append({
+            'id': row.get('id'),
+            'author': row.get('author') or 'CCS Admin',
+            'body': row.get('body') or '',
+            'date': created_at.strftime('%Y-%b-%d') if created_at else '',
+            'pinned': bool(row.get('pinned')),
+            'target_course': row.get('target_course') or '',
+            'target_level': row.get('target_level') or ''
+        })
+    return announcements
 
 
 def fetch_sit_in_history(student_id=None, status=None, date_from=None, date_to=None):
@@ -215,6 +371,7 @@ def build_report_filters(arg_source):
 def get_admin_dashboard_data():
     db = get_db()
     ensure_sit_in_logs_table(db)
+    ensure_announcements_table(db)
 
     cursor = db.cursor(dictionary=True)
 
@@ -248,6 +405,31 @@ def get_admin_dashboard_data():
     """)
     purpose_breakdown = cursor.fetchall()
 
+    cursor.execute("""
+        SELECT id, author, body, created_at, pinned, target_course, target_level
+        FROM announcements
+        WHERE status='active'
+        ORDER BY pinned DESC, created_at DESC
+        LIMIT 15
+    """)
+    announcement_rows = cursor.fetchall()
+
+    cursor.execute("""
+        SELECT DISTINCT course
+        FROM users
+        WHERE id_number NOT LIKE 'adm-%' AND course IS NOT NULL AND course <> ''
+        ORDER BY course ASC
+    """)
+    course_rows = cursor.fetchall()
+
+    cursor.execute("""
+        SELECT DISTINCT course_level
+        FROM users
+        WHERE id_number NOT LIKE 'adm-%' AND course_level IS NOT NULL AND course_level <> ''
+        ORDER BY CAST(course_level AS UNSIGNED), course_level ASC
+    """)
+    level_rows = cursor.fetchall()
+
     cursor.close()
     db.close()
 
@@ -262,7 +444,25 @@ def get_admin_dashboard_data():
         'values': [row['total'] for row in purpose_breakdown]
     }
 
-    return stats, ANNOUNCEMENTS, chart_data
+    announcements = []
+    for row in announcement_rows:
+        created_at = row.get('created_at')
+        announcements.append({
+            'id': row.get('id'),
+            'author': row.get('author') or 'CCS Admin',
+            'body': row.get('body') or '',
+            'date': created_at.strftime('%Y-%b-%d') if created_at else '',
+            'pinned': bool(row.get('pinned')),
+            'target_course': row.get('target_course') or '',
+            'target_level': row.get('target_level') or ''
+        })
+
+    target_options = {
+        'courses': [row['course'] for row in course_rows],
+        'levels': [str(row['course_level']) for row in level_rows]
+    }
+
+    return stats, announcements, chart_data, target_options
 
 
 def lookup_student_session(cursor, student_id):
@@ -276,17 +476,9 @@ def lookup_student_session(cursor, student_id):
     if not student:
         return None, None, None, None
 
-    cursor.execute("""
-        SELECT
-            SUM(CASE WHEN status='completed' THEN 1 ELSE 0 END) AS completed_count,
-            SUM(CASE WHEN status='active' THEN 1 ELSE 0 END) AS active_count
-        FROM sit_in_logs
-        WHERE student_id_number=%s
-    """, (student_id,))
-    counts = cursor.fetchone()
-    completed_sessions = counts['completed_count'] or 0
-    active_sessions = counts['active_count'] or 0
-    remaining_sessions = max(TOTAL_SESSION_LIMIT - completed_sessions - active_sessions, 0)
+    usage = get_session_usage(cursor, student_id)
+    completed_sessions = usage['completed']
+    remaining_sessions = usage['remaining']
 
     cursor.execute("""
         SELECT lab, purpose, started_at
@@ -368,11 +560,139 @@ def about():
 
 @app.route('/admin')
 def admin_dashboard():
-    stats, announcements, chart_data = get_admin_dashboard_data()
+    stats, announcements, chart_data, target_options = get_admin_dashboard_data()
     return render_template('admin_dashboard.html',
                            stats=stats,
                            announcements=announcements,
-                           chart_data=chart_data)
+                           chart_data=chart_data,
+                           target_options=target_options)
+
+
+@app.route('/admin/announcements/create', methods=['POST'])
+def admin_create_announcement():
+    if not is_admin_user():
+        flash('Please log in as admin.', 'danger')
+        return redirect('/')
+
+    body = (request.form.get('body') or '').strip()
+    target_course = (request.form.get('target_course') or '').strip()
+    target_level = (request.form.get('target_level') or '').strip()
+    pinned = 1 if request.form.get('pinned') == '1' else 0
+    if not body:
+        flash('Announcement body is required.', 'warning')
+        return redirect('/admin')
+
+    author = 'CCS Admin'
+    user = session.get('user') or {}
+    if user.get('first_name'):
+        author = f"{user.get('first_name')} {user.get('last_name') or ''}".strip()
+
+    db = get_db()
+    ensure_announcements_table(db)
+    cursor = db.cursor()
+    cursor.execute("""
+        INSERT INTO announcements (author, body, created_by_id, status, pinned, target_course, target_level)
+        VALUES (%s, %s, %s, 'active', %s, %s, %s)
+    """, (author, body, user.get('id_number'), pinned, target_course or None, target_level or None))
+    db.commit()
+    cursor.close()
+    db.close()
+
+    flash('Announcement posted successfully.', 'success')
+    return redirect('/admin')
+
+
+@app.route('/admin/announcements/<int:announcement_id>/update', methods=['POST'])
+def admin_update_announcement(announcement_id):
+    if not is_admin_user():
+        flash('Please log in as admin.', 'danger')
+        return redirect('/')
+
+    body = (request.form.get('body') or '').strip()
+    target_course = (request.form.get('target_course') or '').strip()
+    target_level = (request.form.get('target_level') or '').strip()
+    pinned = 1 if request.form.get('pinned') == '1' else 0
+
+    if not body:
+        flash('Announcement body is required.', 'warning')
+        return redirect('/admin')
+
+    db = get_db()
+    ensure_announcements_table(db)
+    cursor = db.cursor()
+    cursor.execute("""
+        UPDATE announcements
+        SET body=%s,
+            pinned=%s,
+            target_course=%s,
+            target_level=%s
+        WHERE id=%s AND status='active'
+    """, (body, pinned, target_course or None, target_level or None, announcement_id))
+    db.commit()
+    cursor.close()
+    db.close()
+
+    flash('Announcement updated.', 'success')
+    return redirect('/admin')
+
+
+@app.route('/admin/announcements/<int:announcement_id>/delete', methods=['POST'])
+def admin_delete_announcement(announcement_id):
+    if not is_admin_user():
+        flash('Please log in as admin.', 'danger')
+        return redirect('/')
+
+    db = get_db()
+    ensure_announcements_table(db)
+    cursor = db.cursor()
+    cursor.execute("""
+        UPDATE announcements
+        SET status='archived', pinned=0
+        WHERE id=%s
+    """, (announcement_id,))
+    db.commit()
+    cursor.close()
+    db.close()
+
+    flash('Announcement deleted.', 'info')
+    return redirect('/admin')
+
+
+@app.route('/admin/announcements/<int:announcement_id>/pin', methods=['POST'])
+def admin_pin_announcement(announcement_id):
+    if not is_admin_user():
+        flash('Please log in as admin.', 'danger')
+        return redirect('/')
+
+    db = get_db()
+    ensure_announcements_table(db)
+    cursor = db.cursor(dictionary=True)
+    cursor.execute("""
+        SELECT pinned
+        FROM announcements
+        WHERE id=%s AND status='active'
+        LIMIT 1
+    """, (announcement_id,))
+    row = cursor.fetchone()
+    if not row:
+        cursor.close()
+        db.close()
+        flash('Announcement not found.', 'warning')
+        return redirect('/admin')
+
+    new_value = 0 if row['pinned'] else 1
+    cursor = db.cursor()
+    cursor.execute("""
+        UPDATE announcements
+        SET pinned=%s
+        WHERE id=%s
+    """, (new_value, announcement_id))
+    db.commit()
+    cursor.close()
+    db.close()
+
+    flash('Announcement pin updated.', 'success')
+    return redirect('/admin')
 
 
 @app.route('/admin/search', methods=['GET', 'POST'])
@@ -390,6 +710,7 @@ def admin_search():
         else:
             db = get_db()
             ensure_sit_in_logs_table(db)
+            ensure_reservations_table(db)
             cursor = db.cursor(dictionary=True)
 
             cursor.execute("""
@@ -401,17 +722,8 @@ def admin_search():
             student = cursor.fetchone()
 
             if student:
-                cursor.execute("""
-                    SELECT
-                        SUM(CASE WHEN status='completed' THEN 1 ELSE 0 END) AS completed_count,
-                        SUM(CASE WHEN status='active' THEN 1 ELSE 0 END) AS active_count
-                    FROM sit_in_logs
-                    WHERE student_id_number=%s
-                """, (searched_id,))
-                counts = cursor.fetchone()
-                completed_sessions = counts['completed_count'] or 0
-                active_sessions = counts['active_count'] or 0
-                remaining_sessions = max(TOTAL_SESSION_LIMIT - completed_sessions - active_sessions, 0)
+                usage = get_session_usage(cursor, searched_id)
+                remaining_sessions = usage['remaining']
 
                 cursor.execute("""
                     SELECT lab, purpose, started_at
@@ -454,6 +766,7 @@ def admin_search():
 def admin_students():
     db = get_db()
     ensure_sit_in_logs_table(db)
+    ensure_reservations_table(db)
     cursor = db.cursor(dictionary=True)
     cursor.execute("""
         SELECT id_number, last_name, first_name, middle_name, course, course_level
@@ -482,6 +795,18 @@ def admin_students():
                 'active': row['active_sessions'] or 0,
             }
 
+        cursor.execute(f"""
+            SELECT student_id_number, COUNT(*) AS approved_reservations
+            FROM reservations
+            WHERE student_id_number IN ({format_strings})
+              AND status='approved'
+            GROUP BY student_id_number
+        """, student_ids)
+        for row in cursor.fetchall():
+            if row['student_id_number'] not in remaining_lookup:
+                remaining_lookup[row['student_id_number']] = {'completed': 0, 'active': 0}
+            remaining_lookup[row['student_id_number']]['approved'] = row['approved_reservations'] or 0
+
     cursor.close()
     db.close()
 
@@ -491,8 +816,9 @@ def admin_students():
         if user.get('middle_name'):
             full_name = f"{full_name} {user['middle_name']}"
 
-        usage = remaining_lookup.get(user['id_number'], {'completed': 0, 'active': 0})
-        remaining_sessions = max(TOTAL_SESSION_LIMIT - usage['completed'] - usage['active'], 0)
+        usage = remaining_lookup.get(user['id_number'], {'completed': 0, 'active': 0, 'approved': 0})
+        approved = usage.get('approved', 0)
+        remaining_sessions = max(TOTAL_SESSION_LIMIT - usage['completed'] - usage['active'] - approved, 0)
 
         students.append({
             'id_number': user['id_number'],
@@ -598,6 +924,7 @@ def admin_sit_in():
         else:
             db = get_db()
             ensure_sit_in_logs_table(db)
+            ensure_reservations_table(db)
             cursor = db.cursor(dictionary=True)
 
             student, remaining_sessions, active_session, completed_sessions = lookup_student_session(cursor, searched_id)
@@ -641,6 +968,7 @@ def admin_sit_in():
         if searched_id:
             db = get_db()
             ensure_sit_in_logs_table(db)
+            ensure_reservations_table(db)
             cursor = db.cursor(dictionary=True)
             student, remaining_sessions, active_session, _ = lookup_student_session(cursor, searched_id)
             cursor.close()
@@ -1043,7 +1371,315 @@ def admin_sit_in_reports_pdf():
 
 @app.route('/admin/reservations')
 def admin_reservations():
-    return render_template('admin_reservations.html')
+    if not is_admin_user():
+        flash('Please log in as admin.', 'danger')
+        return redirect('/')
+
+    selected_lab = (request.args.get('lab_code') or LABS[0]['code']).strip()
+    selected_date = (request.args.get('reservation_date') or datetime.now().strftime('%Y-%m-%d')).strip()
+    selected_slot = (request.args.get('reservation_slot') or RESERVATION_SLOTS[0]).strip()
+
+    if selected_lab not in LAB_LOOKUP:
+        selected_lab = LABS[0]['code']
+    if selected_slot not in RESERVATION_SLOTS:
+        selected_slot = RESERVATION_SLOTS[0]
+
+    db = get_db()
+    ensure_sit_in_logs_table(db)
+    ensure_reservations_table(db)
+    cursor = db.cursor(dictionary=True)
+
+    cursor.execute("""
+        SELECT
+            r.id,
+            r.student_id_number,
+            r.lab_code,
+            r.seat_no,
+            r.purpose,
+            r.reservation_date,
+            r.reservation_slot,
+            r.status,
+            r.admin_note,
+            r.created_at,
+            r.decided_at,
+            u.first_name,
+            u.last_name,
+            u.middle_name
+        FROM reservations r
+        LEFT JOIN users u ON u.id_number = r.student_id_number
+        WHERE r.student_id_number <> %s
+        ORDER BY CASE r.status WHEN 'pending' THEN 0 ELSE 1 END, r.created_at DESC
+    """, (ADMIN_SEAT_BLOCK_ID,))
+    reservation_rows = cursor.fetchall()
+
+    cursor.execute("""
+        SELECT id, seat_no, status, student_id_number
+        FROM reservations
+        WHERE lab_code=%s
+          AND reservation_date=%s
+          AND reservation_slot=%s
+          AND status IN ('pending', 'approved', 'checked_in')
+        ORDER BY CASE status WHEN 'approved' THEN 0 ELSE 1 END, created_at DESC
+    """, (selected_lab, selected_date, selected_slot))
+    seat_map = {}
+    for row in cursor.fetchall():
+        if row['seat_no'] not in seat_map:
+            seat_map[row['seat_no']] = row
+
+    selected_lab_info = LAB_LOOKUP[selected_lab]
+    seats = []
+    for seat in range(1, selected_lab_info['capacity'] + 1):
+        seat_row = seat_map.get(seat)
+        is_taken = seat_row is not None
+        is_admin_block = bool(seat_row and seat_row['student_id_number'] == ADMIN_SEAT_BLOCK_ID)
+        seats.append({
+            'seat_no': seat,
+            'is_taken': is_taken,
+            'is_admin_block': is_admin_block,
+            'can_toggle': (not is_taken) or is_admin_block,
+            'toggle_label': 'Release' if is_admin_block else 'Mark Occupied'
+        })
+
+    cursor.close()
+    db.close()
+
+    for row in reservation_rows:
+        full_name = f"{row.get('last_name') or ''}, {row.get('first_name') or ''}"
+        if row.get('middle_name'):
+            full_name = f"{full_name} {row['middle_name']}"
+        row['student_name'] = full_name.strip(', ')
+        lab_info = LAB_LOOKUP.get(row['lab_code'])
+        row['lab_label'] = lab_info['label'] if lab_info else row['lab_code']
+
+    return render_template('admin_reservations.html',
+                           reservations=reservation_rows,
+                           labs=LABS,
+                           slots=RESERVATION_SLOTS,
+                           selected_lab=selected_lab,
+                           selected_date=selected_date,
+                           selected_slot=selected_slot,
+                           seats=seats)
+
+
+@app.route('/admin/reservations/seat/toggle', methods=['POST'])
+def admin_toggle_reservation_seat():
+    if not is_admin_user():
+        flash('Please log in as admin.', 'danger')
+        return redirect('/')
+
+    lab_code = (request.form.get('lab_code') or '').strip()
+    reservation_date = (request.form.get('reservation_date') or '').strip()
+    reservation_slot = (request.form.get('reservation_slot') or '').strip()
+    seat_raw = (request.form.get('seat_no') or '').strip()
+
+    if lab_code not in LAB_LOOKUP or reservation_slot not in RESERVATION_SLOTS:
+        flash('Invalid seat toggle request.', 'warning')
+        return redirect('/admin/reservations')
+
+    try:
+        seat_no = int(seat_raw)
+    except ValueError:
+        flash('Invalid seat selected.', 'warning')
+        return redirect('/admin/reservations')
+
+    if seat_no < 1 or seat_no > LAB_LOOKUP[lab_code]['capacity']:
+        flash('Seat number is out of range.', 'warning')
+        return redirect('/admin/reservations')
+
+    try:
+        datetime.strptime(reservation_date, '%Y-%m-%d')
+    except ValueError:
+        flash('Invalid reservation date.', 'warning')
+        return redirect('/admin/reservations')
+
+    db = get_db()
+    ensure_reservations_table(db)
+    cursor = db.cursor(dictionary=True)
+
+    cursor.execute("""
+        SELECT id, student_id_number, status
+        FROM reservations
+        WHERE lab_code=%s
+          AND seat_no=%s
+          AND reservation_date=%s
+          AND reservation_slot=%s
+          AND status IN ('pending', 'approved')
+        ORDER BY CASE status WHEN 'approved' THEN 0 ELSE 1 END, created_at DESC
+        LIMIT 1
+    """, (lab_code, seat_no, reservation_date, reservation_slot))
+    row = cursor.fetchone()
+
+    admin_id = session.get('user', {}).get('id_number', 'admin')
+    if not row:
+        cursor.execute("""
+            INSERT INTO reservations (
+                student_id_number, lab_code, seat_no, purpose,
+                reservation_date, reservation_slot, status, admin_note,
+                decided_at, decided_by
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, 'approved', %s, NOW(), %s)
+        """, (ADMIN_SEAT_BLOCK_ID, lab_code, seat_no, 'Admin seat block', reservation_date, reservation_slot, 'Occupied by admin seat panel', admin_id))
+        db.commit()
+        flash(f'PC {seat_no} marked as occupied.', 'success')
+    elif row['student_id_number'] == ADMIN_SEAT_BLOCK_ID:
+        cursor.execute("""
+            UPDATE reservations
+            SET status='cancelled', decided_at=NOW(), decided_by=%s, admin_note=%s
+            WHERE id=%s
+        """, (admin_id, 'Released from admin seat panel', row['id']))
+        db.commit()
+        flash(f'PC {seat_no} is now available.', 'success')
+    else:
+        flash(f'PC {seat_no} is reserved by a student request.', 'warning')
+
+    cursor.close()
+    db.close()
+    return redirect(f"/admin/reservations?lab_code={lab_code}&reservation_date={reservation_date}&reservation_slot={reservation_slot}")
+
+
+@app.route('/admin/reservations/<int:reservation_id>/decision', methods=['POST'])
+def admin_reservation_decision(reservation_id):
+    if not is_admin_user():
+        flash('Please log in as admin.', 'danger')
+        return redirect('/')
+
+    decision = (request.form.get('decision') or '').strip().lower()
+    admin_note = (request.form.get('admin_note') or '').strip()
+
+    if decision not in ('approved', 'denied', 'checked_in', 'no_show'):
+        flash('Invalid reservation action.', 'danger')
+        return redirect('/admin/reservations')
+
+    if decision in ('denied', 'no_show') and not admin_note:
+        flash('Please provide a reason for this action.', 'warning')
+        return redirect('/admin/reservations')
+
+    db = get_db()
+    ensure_sit_in_logs_table(db)
+    ensure_reservations_table(db)
+    cursor = db.cursor(dictionary=True)
+
+    cursor.execute("""
+        SELECT id, student_id_number, lab_code, seat_no, reservation_date, reservation_slot, status
+        FROM reservations
+        WHERE id=%s
+        LIMIT 1
+    """, (reservation_id,))
+    row = cursor.fetchone()
+
+    if not row:
+        cursor.close()
+        db.close()
+        flash('Reservation request not found.', 'warning')
+        return redirect('/admin/reservations')
+
+    if decision in ('approved', 'denied') and row['status'] != 'pending':
+        cursor.close()
+        db.close()
+        flash('Only pending reservations can be updated.', 'warning')
+        return redirect('/admin/reservations')
+
+    if decision in ('checked_in', 'no_show') and row['status'] != 'approved':
+        cursor.close()
+        db.close()
+        flash('Only approved reservations can be checked in or marked no-show.', 'warning')
+        return redirect('/admin/reservations')
+
+    if decision == 'approved':
+        usage = get_session_usage(cursor, row['student_id_number'])
+        if usage['remaining'] <= 0:
+            cursor.close()
+            db.close()
+            flash('Student has no remaining sessions for reservation approval.', 'warning')
+            return redirect('/admin/reservations')
+
+        cursor.execute("""
+            SELECT id
+            FROM reservations
+            WHERE id <> %s
+              AND lab_code=%s
+              AND seat_no=%s
+              AND reservation_date=%s
+              AND reservation_slot=%s
+              AND status IN ('pending', 'approved', 'checked_in')
+            LIMIT 1
+        """, (row['id'], row['lab_code'], row['seat_no'], row['reservation_date'], row['reservation_slot']))
+        if cursor.fetchone():
+            cursor.close()
+            db.close()
+            flash('Seat already taken for that reservation schedule.', 'warning')
+            return redirect('/admin/reservations')
+
+    if decision == 'checked_in':
+        usage = get_session_usage(cursor, row['student_id_number'])
+        if usage['remaining'] <= 0:
+            cursor.close()
+            db.close()
+            flash('Student has no remaining sessions.', 'warning')
+            return redirect('/admin/reservations')
+
+        cursor.execute("""
+            SELECT COUNT(*) AS active_count
+            FROM sit_in_logs
+            WHERE student_id_number=%s AND status='active'
+        """, (row['student_id_number'],))
+        if (cursor.fetchone() or {}).get('active_count', 0) > 0:
+            cursor.close()
+            db.close()
+            flash('Student already has an active sit-in session.', 'warning')
+            return redirect('/admin/reservations')
+
+        lab_info = LAB_LOOKUP.get(row['lab_code'])
+        if not lab_info:
+            cursor.close()
+            db.close()
+            flash('Invalid laboratory code in reservation.', 'warning')
+            return redirect('/admin/reservations')
+
+        cursor.execute("""
+            SELECT COUNT(*) AS lab_taken
+            FROM sit_in_logs
+            WHERE lab=%s AND status='active'
+        """, (row['lab_code'],))
+        lab_taken = (cursor.fetchone() or {}).get('lab_taken', 0)
+        if lab_taken >= lab_info['capacity']:
+            cursor.close()
+            db.close()
+            flash(f"{lab_info['label']} is currently full.", 'warning')
+            return redirect('/admin/reservations')
+
+        cursor.execute("""
+            SELECT COUNT(*) AS completed_count
+            FROM sit_in_logs
+            WHERE student_id_number=%s AND status='completed'
+        """, (row['student_id_number'],))
+        completed_count = (cursor.fetchone() or {}).get('completed_count', 0)
+
+        cursor.execute("""
+            INSERT INTO sit_in_logs (student_id_number, purpose, lab, session_no, status)
+            VALUES (%s, %s, %s, %s, 'active')
+        """, (row['student_id_number'], row.get('purpose') or 'General use', row['lab_code'], completed_count + 1))
+
+    admin_id = session.get('user', {}).get('id_number', 'admin')
+    cursor.execute("""
+        UPDATE reservations
+        SET status=%s,
+            admin_note=%s,
+            decided_at=NOW(),
+            decided_by=%s
+        WHERE id=%s
+    """, (decision, admin_note or None, admin_id, reservation_id))
+    db.commit()
+    cursor.close()
+    db.close()
+
+    if decision == 'checked_in':
+        flash('Student checked in and sit-in session started.', 'success')
+    elif decision == 'no_show':
+        flash('Reservation marked as no-show.', 'warning')
+    else:
+        flash(f"Reservation {decision}.", 'success')
+    return redirect('/admin/reservations')
 
 
 @app.route('/login_user', methods=['POST'])
@@ -1135,14 +1771,11 @@ def dashboard():
     db = get_db()
     ensure_sit_in_logs_table(db)
     ensure_user_feedback_table(db)
+    ensure_reservations_table(db)
     cursor = db.cursor(dictionary=True)
 
-    cursor.execute("""
-        SELECT COUNT(*) AS total_completed
-        FROM sit_in_logs
-        WHERE student_id_number=%s AND status='completed'
-    """, (user['id_number'],))
-    sessions_used = cursor.fetchone()['total_completed']
+    usage = get_session_usage(cursor, user['id_number'])
+    sessions_used = usage['used']
 
     cursor.execute("""
         SELECT id, lab, purpose, started_at
@@ -1178,6 +1811,26 @@ def dashboard():
     """, (user['id_number'],))
     recent_sessions = cursor.fetchall()
 
+    selected_lab = (request.args.get('lab_code') or LABS[0]['code']).strip()
+    selected_date = (request.args.get('reservation_date') or datetime.now().strftime('%Y-%m-%d')).strip()
+    selected_slot = (request.args.get('reservation_slot') or RESERVATION_SLOTS[0]).strip()
+
+    if selected_lab not in LAB_LOOKUP:
+        selected_lab = LABS[0]['code']
+    if selected_slot not in RESERVATION_SLOTS:
+        selected_slot = RESERVATION_SLOTS[0]
+
+    taken_seats = get_taken_seats(cursor, selected_lab, selected_date, selected_slot)
+
+    cursor.execute("""
+        SELECT id, lab_code, seat_no, purpose, reservation_date, reservation_slot, status, created_at
+        FROM reservations
+        WHERE student_id_number=%s
+        ORDER BY created_at DESC
+        LIMIT 8
+    """, (user['id_number'],))
+    reservation_logs = cursor.fetchall()
+
     cursor.close()
     db.close()
 
@@ -1185,7 +1838,7 @@ def dashboard():
         lab_info = LAB_LOOKUP.get(active_session['lab'])
         active_session['lab_label'] = lab_info['label'] if lab_info else (active_session['lab'] or 'Unassigned')
 
-    sessions_remaining = max(TOTAL_SESSION_LIMIT - sessions_used - (1 if active_session else 0), 0)
+    sessions_remaining = usage['remaining']
 
     lab_cards = []
     for lab in LABS:
@@ -1204,6 +1857,18 @@ def dashboard():
         lab_info = LAB_LOOKUP.get(session_item['lab'])
         session_item['lab_label'] = lab_info['label'] if lab_info else (session_item['lab'] or 'Unassigned')
 
+    selected_lab_info = LAB_LOOKUP[selected_lab]
+    reservation_seats = []
+    for seat in range(1, selected_lab_info['capacity'] + 1):
+        reservation_seats.append({
+            'seat_no': seat,
+            'is_taken': seat in taken_seats
+        })
+
+    for row in reservation_logs:
+        lab_info = LAB_LOOKUP.get(row['lab_code'])
+        row['lab_label'] = lab_info['label'] if lab_info else row['lab_code']
+
     can_start_session = active_session is None and sessions_remaining > 0
 
     return render_template('dashboard.html',
@@ -1213,9 +1878,135 @@ def dashboard():
                            sessions_total=TOTAL_SESSION_LIMIT,
                            active_session=active_session,
                            lab_cards=lab_cards,
-                           announcements=ANNOUNCEMENTS,
+                           announcements=fetch_announcements(limit=10, for_user=user),
                            recent_sessions=recent_sessions,
-                           can_start_session=can_start_session)
+                           can_start_session=can_start_session,
+                           labs=LABS,
+                           slots=RESERVATION_SLOTS,
+                           selected_lab=selected_lab,
+                           selected_date=selected_date,
+                           selected_slot=selected_slot,
+                           reservation_seats=reservation_seats,
+                           reservation_logs=reservation_logs,
+                           purposes=PURPOSES)
+
+
+@app.route('/reservation/create', methods=['POST'])
+def create_reservation():
+    if 'user' not in session:
+        return redirect('/')
+
+    user = session['user']
+    lab_code = (request.form.get('lab_code') or '').strip()
+    reservation_date = (request.form.get('reservation_date') or '').strip()
+    reservation_slot = (request.form.get('reservation_slot') or '').strip()
+    purpose = (request.form.get('purpose') or '').strip()
+    seat_no_raw = (request.form.get('seat_no') or '').strip()
+
+    if lab_code not in LAB_LOOKUP:
+        flash('Please select a valid laboratory.', 'warning')
+        return redirect('/dashboard')
+
+    if reservation_slot not in RESERVATION_SLOTS:
+        flash('Please select a valid reservation slot.', 'warning')
+        return redirect('/dashboard')
+
+    try:
+        seat_no = int(seat_no_raw)
+    except ValueError:
+        flash('Please select a valid PC seat.', 'warning')
+        return redirect('/dashboard')
+
+    if seat_no < 1 or seat_no > LAB_LOOKUP[lab_code]['capacity']:
+        flash('Selected PC seat is out of range for this laboratory.', 'warning')
+        return redirect('/dashboard')
+
+    try:
+        reservation_day = datetime.strptime(reservation_date, '%Y-%m-%d').date()
+    except ValueError:
+        flash('Please choose a valid reservation date.', 'warning')
+        return redirect('/dashboard')
+
+    if reservation_day < datetime.now().date():
+        flash('Reservation date cannot be in the past.', 'warning')
+        return redirect('/dashboard')
+
+    db = get_db()
+    ensure_reservations_table(db)
+    ensure_sit_in_logs_table(db)
+    cursor = db.cursor(dictionary=True)
+
+    usage = get_session_usage(cursor, user['id_number'])
+    if usage['remaining'] <= 0:
+        cursor.close()
+        db.close()
+        flash('You have no remaining sessions for reservation.', 'warning')
+        return redirect('/dashboard')
+
+    cursor.execute("""
+        SELECT id
+        FROM reservations
+        WHERE lab_code=%s
+          AND seat_no=%s
+          AND reservation_date=%s
+          AND reservation_slot=%s
+          AND status IN ('pending', 'approved')
+        LIMIT 1
+    """, (lab_code, seat_no, reservation_date, reservation_slot))
+    if cursor.fetchone():
+        cursor.close()
+        db.close()
+        flash('That PC seat is already reserved for the selected schedule.', 'warning')
+        return redirect(f"/dashboard?lab_code={lab_code}&reservation_date={reservation_date}&reservation_slot={reservation_slot}")
+
+    cursor.execute("""
+        INSERT INTO reservations (student_id_number, lab_code, seat_no, purpose, reservation_date, reservation_slot, status)
+        VALUES (%s, %s, %s, %s, %s, %s, 'pending')
+    """, (user['id_number'], lab_code, seat_no, purpose or 'General use', reservation_date, reservation_slot))
+    db.commit()
+    cursor.close()
+    db.close()
+
+    flash('Reservation request submitted. Waiting for admin approval.', 'success')
+    return redirect(f"/dashboard?lab_code={lab_code}&reservation_date={reservation_date}&reservation_slot={reservation_slot}")
+
+
+@app.route('/reservation/seats')
+def reservation_seats():
+    if 'user' not in session and not is_admin_user():
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 401
+
+    lab_code = (request.args.get('lab_code') or '').strip()
+    reservation_date = (request.args.get('reservation_date') or '').strip()
+    reservation_slot = (request.args.get('reservation_slot') or '').strip()
+
+    if lab_code not in LAB_LOOKUP:
+        return jsonify({'success': False, 'message': 'Invalid lab.'}), 400
+    if reservation_slot not in RESERVATION_SLOTS:
+        return jsonify({'success': False, 'message': 'Invalid time slot.'}), 400
+
+    try:
+        datetime.strptime(reservation_date, '%Y-%m-%d')
+    except ValueError:
+        return jsonify({'success': False, 'message': 'Invalid reservation date.'}), 400
+
+    db = get_db()
+    ensure_reservations_table(db)
+    cursor = db.cursor(dictionary=True)
+    taken = get_taken_seats(cursor, lab_code, reservation_date, reservation_slot)
+    capacity = LAB_LOOKUP[lab_code]['capacity']
+    seats = []
+    for seat in range(1, capacity + 1):
+        seats.append({'seat_no': seat, 'is_taken': seat in taken})
+    cursor.close()
+    db.close()
+
+    return jsonify({
+        'success': True,
+        'lab_code': lab_code,
+        'capacity': capacity,
+        'seats': seats
+    })
 
 
 @app.route('/feedback/submit', methods=['POST'])
@@ -1311,6 +2102,7 @@ def start_sit_in():
 
     db = get_db()
     ensure_sit_in_logs_table(db)
+    ensure_reservations_table(db)
     cursor = db.cursor(dictionary=True)
 
     cursor.execute("""
@@ -1324,13 +2116,9 @@ def start_sit_in():
         flash('You already have an active sit-in session.', 'warning')
         return redirect('/dashboard')
 
-    cursor.execute("""
-        SELECT COUNT(*) AS completed_count
-        FROM sit_in_logs
-        WHERE student_id_number=%s AND status='completed'
-    """, (user['id_number'],))
-    completed_sessions = cursor.fetchone()['completed_count']
-    if completed_sessions >= TOTAL_SESSION_LIMIT:
+    usage = get_session_usage(cursor, user['id_number'])
+    completed_sessions = usage['completed']
+    if usage['remaining'] <= 0:
         cursor.close()
         db.close()
         flash('You have reached the maximum number of sessions.', 'warning')

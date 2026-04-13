@@ -348,6 +348,91 @@ body {
   color: #198754;
 }
 
+.status-pill.status-pending {
+  background: rgba(255, 193, 7, 0.2);
+  color: #8a6d00;
+}
+
+.status-pill.status-approved {
+  background: rgba(25, 135, 84, 0.15);
+  color: #198754;
+}
+
+.status-pill.status-checked_in {
+  background: rgba(13, 110, 253, 0.15);
+  color: #0d6efd;
+}
+
+.status-pill.status-denied,
+.status-pill.status-cancelled,
+.status-pill.status-no_show {
+  background: rgba(220, 53, 69, 0.14);
+  color: #b02a37;
+}
+
+.seat-legend {
+  font-size: 0.85rem;
+  color: #5f6368;
+}
+
+.seat-badge {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  vertical-align: middle;
+  margin-right: 4px;
+}
+
+.seat-available {
+  background: #20a464;
+}
+
+.seat-taken {
+  background: #dc3545;
+}
+
+.seat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+  gap: 8px;
+}
+
+.seat-chip {
+  border-radius: 8px;
+  padding: 8px 6px;
+  text-align: center;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.seat-chip-btn {
+  width: 100%;
+  cursor: pointer;
+}
+
+.seat-chip-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.75;
+}
+
+.seat-chip-selected {
+  outline: 2px solid #0d6efd;
+  box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.2);
+}
+
+.seat-chip-available {
+  background: rgba(32, 164, 100, 0.15);
+  color: #176f46;
+  border: 1px solid rgba(32, 164, 100, 0.3);
+}
+
+.seat-chip-taken {
+  background: rgba(220, 53, 69, 0.13);
+  color: #a11f2f;
+  border: 1px solid rgba(220, 53, 69, 0.3);
+}
+
 .session-balance-card .display-5 {
   font-size: 2.5rem;
 }

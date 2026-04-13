@@ -187,9 +187,210 @@
         </div>
       </div>
     </div>
+
+    <div class="row g-4 mb-4">
+      <div class="col-lg-7">
+        <div class="info-card h-100">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="mb-0">Advance Reservation</h5>
+            <button class="btn btn-primary btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#reservationModal">Reserve Seat</button>
+          </div>
+          <p class="text-muted mb-2">Use the reservation popup to pick schedule and click a PC seat button.</p>
+          <div class="seat-legend mb-2">
+            <span class="seat-badge seat-available"></span> Available
+            <span class="seat-badge seat-taken ms-3"></span> Not Available
+          </div>
+          <div class="seat-grid mb-3">
+            {% for seat in reservation_seats %}
+              <div class="seat-chip {% if seat.is_taken %}seat-chip-taken{% else %}seat-chip-available{% endif %}">
+                PC {{ seat.seat_no }}
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-5">
+        <div class="info-card h-100">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="mb-0">Reservation Logs</h5>
+            <span class="text-muted small">Last 8 entries</span>
+          </div>
+          <div class="table-responsive">
+            <table class="table align-middle">
+              <thead>
+                <tr>
+                  <th>Lab/PC</th>
+                  <th>Schedule</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% if reservation_logs %}
+                  {% for row in reservation_logs %}
+                    <tr>
+                      <td>
+                        <div>{{ row.lab_label }}</div>
+                        <div class="small text-muted">PC {{ row.seat_no }} | {{ row.purpose }}</div>
+                      </td>
+                      <td>
+                        <div>{{ row.reservation_date.strftime('%b %d, %Y') if row.reservation_date }}</div>
+                        <div class="small text-muted">{{ row.reservation_slot }}</div>
+                      </td>
+                      <td><span class="status-pill status-{{ row.status }}">{{ row.status|capitalize }}</span></td>
+                    </tr>
+                  {% endfor %}
+                {% else %}
+                  <tr><td colspan="3" class="text-center text-muted">No reservation logs yet.</td></tr>
+                {% endif %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade" id="reservationModal" tabindex="-1" aria-labelledby="reservationModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="reservationModalLabel">Reserve a Seat</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <form method="POST" action="/reservation/create" id="reservationForm">
+            <div class="modal-body">
+              <div class="row g-2 mb-3">
+                <div class="col-md-4">
+                  <label class="form-label mb-1">Laboratory</label>
+                  <select class="form-select" name="lab_code" id="reserveLab" required>
+                    {% for lab in labs %}
+                      <option value="{{ lab.code }}" {% if lab.code == selected_lab %}selected{% endif %}>{{ lab.label }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label mb-1">Date</label>
+                  <input class="form-control" type="date" name="reservation_date" id="reserveDate" value="{{ selected_date }}" required>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label mb-1">Time Slot</label>
+                  <select class="form-select" name="reservation_slot" id="reserveSlot" required>
+                    {% for slot in slots %}
+                      <option value="{{ slot }}" {% if slot == selected_slot %}selected{% endif %}>{{ slot }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+              </div>
+
+              <div class="row g-2 mb-3">
+                <div class="col-md-6">
+                  <label class="form-label mb-1">Purpose</label>
+                  <select class="form-select" name="purpose" required>
+                    <option value="" selected disabled>Select purpose</option>
+                    {% for item in purposes %}
+                      <option value="{{ item }}">{{ item }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label mb-1">Selected PC Seat</label>
+                  <input class="form-control" id="selectedSeatLabel" value="None selected" readonly>
+                  <input type="hidden" name="seat_no" id="selectedSeatInput" required>
+                </div>
+              </div>
+
+              <div class="seat-legend mb-2">
+                <span class="seat-badge seat-available"></span> Available
+                <span class="seat-badge seat-taken ms-3"></span> Taken
+              </div>
+              <div id="reserveSeatGrid" class="seat-grid"></div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+              <button type="submit" class="btn btn-primary" id="submitReservationBtn" disabled>Submit Reservation</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
   <script>
+    const seatGrid = document.getElementById('reserveSeatGrid');
+    const reserveLab = document.getElementById('reserveLab');
+    const reserveDate = document.getElementById('reserveDate');
+    const reserveSlot = document.getElementById('reserveSlot');
+    const selectedSeatLabel = document.getElementById('selectedSeatLabel');
+    const selectedSeatInput = document.getElementById('selectedSeatInput');
+    const submitReservationBtn = document.getElementById('submitReservationBtn');
+
+    function resetSelectedSeat() {
+      selectedSeatInput.value = '';
+      selectedSeatLabel.value = 'None selected';
+      submitReservationBtn.disabled = true;
+    }
+
+    function renderSeatButtons(seats) {
+      seatGrid.innerHTML = '';
+      seats.forEach((seat) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = `PC ${seat.seat_no}`;
+        button.className = `seat-chip seat-chip-btn ${seat.is_taken ? 'seat-chip-taken' : 'seat-chip-available'}`;
+
+        if (seat.is_taken) {
+          button.disabled = true;
+        } else {
+          button.addEventListener('click', () => {
+            document.querySelectorAll('#reserveSeatGrid .seat-chip-btn').forEach((el) => {
+              el.classList.remove('seat-chip-selected');
+            });
+            button.classList.add('seat-chip-selected');
+            selectedSeatInput.value = String(seat.seat_no);
+            selectedSeatLabel.value = `PC ${seat.seat_no}`;
+            submitReservationBtn.disabled = false;
+          });
+        }
+        seatGrid.appendChild(button);
+      });
+    }
+
+    async function refreshSeatAvailability() {
+      resetSelectedSeat();
+      const params = new URLSearchParams({
+        lab_code: reserveLab.value,
+        reservation_date: reserveDate.value,
+        reservation_slot: reserveSlot.value
+      });
+
+      const response = await fetch(`/reservation/seats?${params.toString()}`);
+      if (!response.ok) {
+        seatGrid.innerHTML = '<div class="text-danger small">Unable to load seats.</div>';
+        return;
+      }
+      const data = await response.json();
+      renderSeatButtons(data.seats || []);
+    }
+
+    ['change', 'input'].forEach((eventName) => {
+      reserveLab.addEventListener(eventName, refreshSeatAvailability);
+      reserveDate.addEventListener(eventName, refreshSeatAvailability);
+      reserveSlot.addEventListener(eventName, refreshSeatAvailability);
+    });
+
+    const reservationModal = document.getElementById('reservationModal');
+    let seatRefreshTimer = null;
+    reservationModal.addEventListener('shown.bs.modal', () => {
+      refreshSeatAvailability();
+      seatRefreshTimer = window.setInterval(refreshSeatAvailability, 10000);
+    });
+    reservationModal.addEventListener('hidden.bs.modal', () => {
+      if (seatRefreshTimer) {
+        window.clearInterval(seatRefreshTimer);
+        seatRefreshTimer = null;
+      }
+    });
+
     window.setTimeout(() => {
       document.querySelectorAll('.alert').forEach((alertEl) => {
         alertEl.classList.remove('show');
