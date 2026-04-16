@@ -251,14 +251,14 @@
     </div>
 
     <div class="modal fade" id="reservationModal" tabindex="-1" aria-labelledby="reservationModalLabel" aria-hidden="true">
-      <div class="modal-dialog modal-lg modal-dialog-scrollable">
-        <div class="modal-content">
+      <div class="modal-dialog modal-lg modal-dialog-scrollable reservation-modal-dialog">
+        <div class="modal-content reservation-modal-content">
           <div class="modal-header">
             <h5 class="modal-title" id="reservationModalLabel">Reserve a Seat</h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <form method="POST" action="/reservation/create" id="reservationForm">
-            <div class="modal-body">
+            <div class="modal-body reservation-modal-body">
               <div class="row g-2 mb-3">
                 <div class="col-md-4">
                   <label class="form-label mb-1">Laboratory</label>
@@ -303,7 +303,9 @@
                 <span class="seat-badge seat-available"></span> Available
                 <span class="seat-badge seat-taken ms-3"></span> Taken
               </div>
-              <div id="reserveSeatGrid" class="seat-grid"></div>
+              <div class="seat-grid-shell">
+                <div id="reserveSeatGrid" class="seat-grid"></div>
+              </div>
             </div>
             <div class="modal-footer">
               <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
@@ -323,11 +325,26 @@
     const selectedSeatLabel = document.getElementById('selectedSeatLabel');
     const selectedSeatInput = document.getElementById('selectedSeatInput');
     const submitReservationBtn = document.getElementById('submitReservationBtn');
+    let selectedSeatNo = '';
 
     function resetSelectedSeat() {
+      selectedSeatNo = '';
       selectedSeatInput.value = '';
       selectedSeatLabel.value = 'None selected';
       submitReservationBtn.disabled = true;
+      document.querySelectorAll('#reserveSeatGrid .seat-chip-btn').forEach((el) => {
+        el.classList.remove('seat-chip-selected');
+      });
+    }
+
+    function selectSeat(seatNo) {
+      selectedSeatNo = String(seatNo);
+      selectedSeatInput.value = selectedSeatNo;
+      selectedSeatLabel.value = `PC ${seatNo}`;
+      submitReservationBtn.disabled = false;
+      document.querySelectorAll('#reserveSeatGrid .seat-chip-btn').forEach((el) => {
+        el.classList.toggle('seat-chip-selected', el.dataset.seatNo === selectedSeatNo);
+      });
     }
 
     function renderSeatButtons(seats) {
@@ -335,6 +352,7 @@
       seats.forEach((seat) => {
         const button = document.createElement('button');
         button.type = 'button';
+        button.dataset.seatNo = String(seat.seat_no);
         button.textContent = `PC ${seat.seat_no}`;
         button.className = `seat-chip seat-chip-btn ${seat.is_taken ? 'seat-chip-taken' : 'seat-chip-available'}`;
 
@@ -342,21 +360,33 @@
           button.disabled = true;
         } else {
           button.addEventListener('click', () => {
-            document.querySelectorAll('#reserveSeatGrid .seat-chip-btn').forEach((el) => {
-              el.classList.remove('seat-chip-selected');
-            });
-            button.classList.add('seat-chip-selected');
-            selectedSeatInput.value = String(seat.seat_no);
-            selectedSeatLabel.value = `PC ${seat.seat_no}`;
-            submitReservationBtn.disabled = false;
+            selectSeat(seat.seat_no);
           });
         }
         seatGrid.appendChild(button);
       });
     }
 
-    async function refreshSeatAvailability() {
-      resetSelectedSeat();
+    function restoreSelectedSeat(seats) {
+      if (!selectedSeatNo) {
+        return;
+      }
+
+      const seatStillAvailable = seats.some((seat) => String(seat.seat_no) === selectedSeatNo && !seat.is_taken);
+      if (!seatStillAvailable) {
+        resetSelectedSeat();
+        return;
+      }
+
+      selectSeat(selectedSeatNo);
+    }
+
+    async function refreshSeatAvailability({ preserveSelection = true } = {}) {
+      const currentSelectedSeat = selectedSeatNo;
+      if (!preserveSelection) {
+        resetSelectedSeat();
+      }
+
       const params = new URLSearchParams({
         lab_code: reserveLab.value,
         reservation_date: reserveDate.value,
@@ -370,12 +400,16 @@
       }
       const data = await response.json();
       renderSeatButtons(data.seats || []);
+
+      if (preserveSelection && currentSelectedSeat) {
+        restoreSelectedSeat(data.seats || []);
+      }
     }
 
     ['change', 'input'].forEach((eventName) => {
-      reserveLab.addEventListener(eventName, refreshSeatAvailability);
-      reserveDate.addEventListener(eventName, refreshSeatAvailability);
-      reserveSlot.addEventListener(eventName, refreshSeatAvailability);
+      reserveLab.addEventListener(eventName, () => refreshSeatAvailability({ preserveSelection: false }));
+      reserveDate.addEventListener(eventName, () => refreshSeatAvailability({ preserveSelection: false }));
+      reserveSlot.addEventListener(eventName, () => refreshSeatAvailability({ preserveSelection: false }));
     });
 
     const reservationModal = document.getElementById('reservationModal');
@@ -389,6 +423,7 @@
         window.clearInterval(seatRefreshTimer);
         seatRefreshTimer = null;
       }
+      resetSelectedSeat();
     });
 
     window.setTimeout(() => {

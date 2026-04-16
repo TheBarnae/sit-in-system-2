@@ -375,6 +375,29 @@ body {
   color: #5f6368;
 }
 
+.reservation-modal-dialog {
+  width: min(980px, calc(100vw - 1rem));
+  max-width: none;
+  margin: 0.5rem auto;
+}
+
+.reservation-modal-content {
+  max-height: calc(100vh - 1rem);
+}
+
+.reservation-modal-body {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.seat-grid-shell {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
 .seat-badge {
   display: inline-block;
   width: 12px;
@@ -394,7 +417,7 @@ body {
 
 .seat-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(68px, 1fr));
   gap: 8px;
 }
 
@@ -431,6 +454,36 @@ body {
   background: rgba(220, 53, 69, 0.13);
   color: #a11f2f;
   border: 1px solid rgba(220, 53, 69, 0.3);
+}
+
+@media (max-height: 860px) {
+  .reservation-modal-dialog {
+    margin: 0.25rem auto;
+    width: min(980px, calc(100vw - 0.5rem));
+  }
+
+  .reservation-modal-content {
+    max-height: calc(100vh - 0.5rem);
+  }
+
+  .reservation-modal-body {
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+  }
+
+  .seat-grid-shell {
+    max-height: 38vh;
+  }
+
+  .seat-grid {
+    grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+    gap: 6px;
+  }
+
+  .seat-chip {
+    padding: 7px 5px;
+    font-size: 0.75rem;
+  }
 }
 
 .session-balance-card .display-5 {
