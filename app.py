@@ -110,6 +110,12 @@ def ensure_user_feedback_table(db):
             sit_in_log_id INT DEFAULT NULL,
             rating TINYINT DEFAULT NULL,
             feedback_text TEXT NOT NULL,
+            admin_feedback_text TEXT DEFAULT NULL,
+            admin_points_reason TEXT DEFAULT NULL,
+            points_awarded INT NOT NULL DEFAULT 0,
+            tidiness_status ENUM('tidy', 'not_tidy') DEFAULT NULL,
+            admin_reviewed_at DATETIME DEFAULT NULL,
+            admin_reviewer_id VARCHAR(20) DEFAULT NULL,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
             INDEX idx_student_id_number (student_id_number),
@@ -122,6 +128,22 @@ def ensure_user_feedback_table(db):
                 ON DELETE SET NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
     """)
+
+    # Backward-compatible column creation for existing databases.
+    alter_statements = [
+        "ALTER TABLE user_feedback ADD COLUMN admin_feedback_text TEXT DEFAULT NULL",
+        "ALTER TABLE user_feedback ADD COLUMN admin_points_reason TEXT DEFAULT NULL",
+        "ALTER TABLE user_feedback ADD COLUMN points_awarded INT NOT NULL DEFAULT 0",
+        "ALTER TABLE user_feedback ADD COLUMN tidiness_status ENUM('tidy', 'not_tidy') DEFAULT NULL",
+        "ALTER TABLE user_feedback ADD COLUMN admin_reviewed_at DATETIME DEFAULT NULL",
+        "ALTER TABLE user_feedback ADD COLUMN admin_reviewer_id VARCHAR(20) DEFAULT NULL",
+    ]
+    for stmt in alter_statements:
+        try:
+            cursor.execute(stmt)
+        except mysql.connector.Error:
+            pass
+
     cursor.close()
 
 
@@ -465,6 +487,59 @@ def get_admin_dashboard_data():
     return stats, announcements, chart_data, target_options
 
 
+def fetch_leaderboard(limit=10):
+    safe_limit = max(1, min(int(limit), 100))
+
+    db = get_db()
+    ensure_sit_in_logs_table(db)
+    ensure_user_feedback_table(db)
+    cursor = db.cursor(dictionary=True)
+
+    cursor.execute("""
+        SELECT
+            u.id_number,
+            u.last_name,
+            u.first_name,
+            u.middle_name,
+            u.course,
+            u.course_level,
+            COALESCE(stats.total_points, 0) AS total_points,
+            COALESCE(stats.completed_sessions, 0) AS completed_sessions,
+            COALESCE(stats.total_minutes, 0) AS total_minutes
+        FROM users u
+        LEFT JOIN (
+            SELECT
+                s.student_id_number,
+                SUM(COALESCE(f.points_awarded, 0)) AS total_points,
+                SUM(CASE WHEN s.status='completed' THEN 1 ELSE 0 END) AS completed_sessions,
+                SUM(
+                    CASE
+                        WHEN s.status='completed' AND s.ended_at IS NOT NULL
+                            THEN TIMESTAMPDIFF(MINUTE, s.started_at, s.ended_at)
+                        ELSE 0
+                    END
+                ) AS total_minutes
+            FROM sit_in_logs s
+            LEFT JOIN user_feedback f ON f.sit_in_log_id = s.id
+            GROUP BY s.student_id_number
+        ) stats ON stats.student_id_number = u.id_number
+        WHERE u.id_number NOT LIKE 'adm-%'
+        ORDER BY total_points DESC, completed_sessions DESC, total_minutes DESC, u.last_name ASC, u.first_name ASC
+    """)
+    rows = cursor.fetchall()
+    cursor.close()
+    db.close()
+
+    for index, row in enumerate(rows, start=1):
+        row['rank'] = index
+        middle_name = f" {row['middle_name']}" if row.get('middle_name') else ''
+        row['full_name'] = f"{row.get('last_name') or ''}, {row.get('first_name') or ''}{middle_name}".strip(', ')
+        minutes = row.get('total_minutes') or 0
+        row['total_hours'] = round(minutes / 60, 2)
+
+    return rows[:safe_limit], rows
+
+
 def lookup_student_session(cursor, student_id):
     cursor.execute("""
         SELECT id_number, last_name, first_name, middle_name, course, course_level
@@ -560,12 +635,28 @@ def about():
 
 @app.route('/admin')
 def admin_dashboard():
+    if not is_admin_user():
+        flash('Please log in as admin.', 'danger')
+        return redirect('/')
+
     stats, announcements, chart_data, target_options = get_admin_dashboard_data()
+    leaderboard_preview, _ = fetch_leaderboard(limit=5)
     return render_template('admin_dashboard.html',
                            stats=stats,
                            announcements=announcements,
                            chart_data=chart_data,
-                           target_options=target_options)
+                           target_options=target_options,
+                           leaderboard_preview=leaderboard_preview)
+
+
+@app.route('/admin/leaderboard')
+def admin_leaderboard():
+    if not is_admin_user():
+        flash('Please log in as admin.', 'danger')
+        return redirect('/')
+
+    leaderboard_rows, _ = fetch_leaderboard(limit=100)
+    return render_template('admin_leaderboard.html', leaderboard_rows=leaderboard_rows)
 
 
 @app.route('/admin/announcements/create', methods=['POST'])
@@ -1228,8 +1319,15 @@ def admin_feedback_reports():
     cursor.execute("""
         SELECT
             f.id,
+            f.sit_in_log_id,
             f.rating,
             f.feedback_text,
+            f.admin_feedback_text,
+            f.admin_points_reason,
+            f.points_awarded,
+            f.tidiness_status,
+            f.admin_reviewed_at,
+            f.admin_reviewer_id,
             f.created_at,
             u.id_number,
             u.last_name,
@@ -1260,6 +1358,93 @@ def admin_feedback_reports():
         row['lab_label'] = lab_info['label'] if lab_info else (row['lab'] or 'Unassigned')
 
     return render_template('admin_feedback_reports.html', feedback_rows=feedback_rows)
+
+
+@app.route('/admin/feedback/<int:feedback_id>/review', methods=['POST'])
+def admin_review_feedback(feedback_id):
+    if not is_admin_user():
+        flash('Please log in as admin.', 'danger')
+        return redirect('/')
+
+    admin_feedback_text = (request.form.get('admin_feedback_text') or '').strip()
+    admin_points_reason = (request.form.get('admin_points_reason') or '').strip()
+    tidiness_status = (request.form.get('tidiness_status') or '').strip().lower()
+    points_raw = (request.form.get('points_awarded') or '').strip()
+
+    if not admin_feedback_text:
+        flash('Admin feedback for the student is required.', 'warning')
+        return redirect('/admin/feedback-reports')
+
+    if not admin_points_reason:
+        flash('Please provide a reason for the awarded points.', 'warning')
+        return redirect('/admin/feedback-reports')
+
+    if points_raw:
+        try:
+            points_awarded = int(points_raw)
+        except ValueError:
+            flash('Points must be a whole number.', 'danger')
+            return redirect('/admin/feedback-reports')
+    else:
+        points_awarded = 0
+
+    if tidiness_status not in ('tidy', 'not_tidy', ''):
+        flash('Invalid criteria tag selected.', 'warning')
+        return redirect('/admin/feedback-reports')
+
+    if points_awarded < 0 or points_awarded > 100:
+        flash('Points must be between 0 and 100.', 'danger')
+        return redirect('/admin/feedback-reports')
+
+    db = get_db()
+    ensure_sit_in_logs_table(db)
+    ensure_user_feedback_table(db)
+    cursor = db.cursor(dictionary=True)
+
+    cursor.execute("""
+        SELECT f.id, f.sit_in_log_id, s.status
+        FROM user_feedback f
+        LEFT JOIN sit_in_logs s ON s.id = f.sit_in_log_id
+        WHERE f.id=%s
+        LIMIT 1
+    """, (feedback_id,))
+    feedback_row = cursor.fetchone()
+
+    if not feedback_row:
+        cursor.close()
+        db.close()
+        flash('Feedback record not found.', 'warning')
+        return redirect('/admin/feedback-reports')
+
+    if feedback_row.get('status') != 'completed':
+        cursor.close()
+        db.close()
+        flash('Admin review is only allowed for completed sessions.', 'warning')
+        return redirect('/admin/feedback-reports')
+
+    cursor.execute("""
+        UPDATE user_feedback
+        SET admin_feedback_text=%s,
+            admin_points_reason=%s,
+            points_awarded=%s,
+            tidiness_status=%s,
+            admin_reviewed_at=NOW(),
+            admin_reviewer_id=%s
+        WHERE id=%s
+    """, (
+        admin_feedback_text,
+        admin_points_reason,
+        points_awarded,
+        tidiness_status or None,
+        (session.get('user') or {}).get('id_number'),
+        feedback_id,
+    ))
+    db.commit()
+    cursor.close()
+    db.close()
+
+    flash('Admin feedback and points saved.', 'success')
+    return redirect('/admin/feedback-reports')
 
 
 @app.route('/admin/sit-in-reports/pdf')
@@ -1537,6 +1722,120 @@ def admin_toggle_reservation_seat():
     return redirect(f"/admin/reservations?lab_code={lab_code}&reservation_date={reservation_date}&reservation_slot={reservation_slot}")
 
 
+@app.route('/admin/reservations/seat/block-all', methods=['POST'])
+def admin_block_all_seats():
+    if not is_admin_user():
+        flash('Please log in as admin.', 'danger')
+        return redirect('/')
+
+    lab_code = (request.form.get('lab_code') or '').strip()
+    reservation_date = (request.form.get('reservation_date') or '').strip()
+    reservation_slot = (request.form.get('reservation_slot') or '').strip()
+
+    if lab_code not in LAB_LOOKUP or reservation_slot not in RESERVATION_SLOTS:
+        flash('Invalid seat block request.', 'warning')
+        return redirect('/admin/reservations')
+
+    try:
+        datetime.strptime(reservation_date, '%Y-%m-%d')
+    except ValueError:
+        flash('Invalid reservation date.', 'warning')
+        return redirect('/admin/reservations')
+
+    db = get_db()
+    ensure_reservations_table(db)
+    cursor = db.cursor(dictionary=True)
+
+    cursor.execute("""
+        SELECT seat_no, student_id_number, status
+        FROM reservations
+        WHERE lab_code=%s
+          AND reservation_date=%s
+          AND reservation_slot=%s
+          AND status IN ('pending', 'approved', 'checked_in')
+    """, (lab_code, reservation_date, reservation_slot))
+    existing = {row['seat_no']: row for row in cursor.fetchall()}
+
+    admin_id = session.get('user', {}).get('id_number', 'admin')
+    capacity = LAB_LOOKUP[lab_code]['capacity']
+    blocked_count = 0
+    skipped_count = 0
+
+    for seat_no in range(1, capacity + 1):
+        row = existing.get(seat_no)
+        if row:
+            skipped_count += 1
+            continue
+
+        cursor.execute("""
+            INSERT INTO reservations (
+                student_id_number, lab_code, seat_no, purpose,
+                reservation_date, reservation_slot, status, admin_note,
+                decided_at, decided_by
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, 'approved', %s, NOW(), %s)
+        """, (ADMIN_SEAT_BLOCK_ID, lab_code, seat_no, 'Admin seat block', reservation_date, reservation_slot, 'Occupied by admin seat panel', admin_id))
+        blocked_count += 1
+
+    db.commit()
+    cursor.close()
+    db.close()
+
+    if blocked_count:
+        flash(f'Disabled {blocked_count} PC(s). Skipped {skipped_count} already taken.', 'success')
+    else:
+        flash('No available PCs to disable for this schedule.', 'info')
+
+    return redirect(f"/admin/reservations?lab_code={lab_code}&reservation_date={reservation_date}&reservation_slot={reservation_slot}")
+
+
+@app.route('/admin/reservations/seat/unblock-all', methods=['POST'])
+def admin_unblock_all_seats():
+    if not is_admin_user():
+        flash('Please log in as admin.', 'danger')
+        return redirect('/')
+
+    lab_code = (request.form.get('lab_code') or '').strip()
+    reservation_date = (request.form.get('reservation_date') or '').strip()
+    reservation_slot = (request.form.get('reservation_slot') or '').strip()
+
+    if lab_code not in LAB_LOOKUP or reservation_slot not in RESERVATION_SLOTS:
+        flash('Invalid seat release request.', 'warning')
+        return redirect('/admin/reservations')
+
+    try:
+        datetime.strptime(reservation_date, '%Y-%m-%d')
+    except ValueError:
+        flash('Invalid reservation date.', 'warning')
+        return redirect('/admin/reservations')
+
+    db = get_db()
+    ensure_reservations_table(db)
+    cursor = db.cursor(dictionary=True)
+
+    admin_id = session.get('user', {}).get('id_number', 'admin')
+    cursor.execute("""
+        UPDATE reservations
+        SET status='cancelled', decided_at=NOW(), decided_by=%s, admin_note=%s
+        WHERE lab_code=%s
+          AND reservation_date=%s
+          AND reservation_slot=%s
+          AND student_id_number=%s
+          AND status IN ('pending', 'approved')
+    """, (admin_id, 'Released from admin seat panel', lab_code, reservation_date, reservation_slot, ADMIN_SEAT_BLOCK_ID))
+    db.commit()
+    released = cursor.rowcount
+    cursor.close()
+    db.close()
+
+    if released:
+        flash(f'Enabled {released} PC(s).', 'success')
+    else:
+        flash('No admin-blocked PCs to enable for this schedule.', 'info')
+
+    return redirect(f"/admin/reservations?lab_code={lab_code}&reservation_date={reservation_date}&reservation_slot={reservation_slot}")
+
+
 @app.route('/admin/reservations/<int:reservation_id>/decision', methods=['POST'])
 def admin_reservation_decision(reservation_id):
     if not is_admin_user():
@@ -1802,7 +2101,12 @@ def dashboard():
             s.status,
             s.started_at,
             s.ended_at,
-            f.id AS feedback_id
+            f.id AS feedback_id,
+            f.admin_feedback_text,
+            f.admin_points_reason,
+            f.points_awarded,
+            f.tidiness_status,
+            f.admin_reviewed_at
         FROM sit_in_logs s
         LEFT JOIN user_feedback f ON f.sit_in_log_id = s.id
         WHERE s.student_id_number=%s
@@ -1810,6 +2114,35 @@ def dashboard():
         LIMIT 5
     """, (user['id_number'],))
     recent_sessions = cursor.fetchall()
+
+    cursor.execute("""
+        SELECT
+            COUNT(*) AS total_sessions,
+            SUM(
+                CASE
+                    WHEN ended_at IS NOT NULL
+                        THEN TIMESTAMPDIFF(MINUTE, started_at, ended_at)
+                    ELSE 0
+                END
+            ) AS total_minutes,
+            AVG(
+                CASE
+                    WHEN ended_at IS NOT NULL
+                        THEN TIMESTAMPDIFF(MINUTE, started_at, ended_at)
+                    ELSE NULL
+                END
+            ) AS avg_minutes,
+            MAX(
+                CASE
+                    WHEN ended_at IS NOT NULL
+                        THEN TIMESTAMPDIFF(MINUTE, started_at, ended_at)
+                    ELSE 0
+                END
+            ) AS max_minutes
+        FROM sit_in_logs
+        WHERE student_id_number=%s AND status='completed'
+    """, (user['id_number'],))
+    summary_row = cursor.fetchone() or {}
 
     selected_lab = (request.args.get('lab_code') or LABS[0]['code']).strip()
     selected_date = (request.args.get('reservation_date') or datetime.now().strftime('%Y-%m-%d')).strip()
@@ -1869,7 +2202,26 @@ def dashboard():
         lab_info = LAB_LOOKUP.get(row['lab_code'])
         row['lab_label'] = lab_info['label'] if lab_info else row['lab_code']
 
+    total_minutes = int(summary_row.get('total_minutes') or 0)
+    avg_minutes = float(summary_row.get('avg_minutes') or 0)
+    max_minutes = int(summary_row.get('max_minutes') or 0)
+
+    def format_minutes(total):
+        hours = total // 60
+        minutes = total % 60
+        return f"{hours}h {minutes}m"
+
+    sit_in_summary = {
+        'total_hours': round(total_minutes / 60, 2),
+        'total_sessions': int(summary_row.get('total_sessions') or 0),
+        'avg_duration': format_minutes(int(round(avg_minutes))) if avg_minutes else '0h 0m',
+        'longest_duration': format_minutes(max_minutes) if max_minutes else '0h 0m',
+    }
+
     can_start_session = active_session is None and sessions_remaining > 0
+
+    leaderboard_preview, leaderboard_all = fetch_leaderboard(limit=8)
+    my_rank = next((row for row in leaderboard_all if row['id_number'] == user['id_number']), None)
 
     return render_template('dashboard.html',
                            user=user,
@@ -1888,7 +2240,38 @@ def dashboard():
                            selected_slot=selected_slot,
                            reservation_seats=reservation_seats,
                            reservation_logs=reservation_logs,
-                           purposes=PURPOSES)
+                           purposes=PURPOSES,
+                           leaderboard_preview=leaderboard_preview,
+                           my_rank=my_rank,
+                           sit_in_summary=sit_in_summary)
+
+
+@app.route('/leaderboard')
+def student_leaderboard():
+    if 'user' not in session:
+        return redirect('/')
+
+    user = session['user']
+    if is_admin_user():
+        return redirect('/admin/leaderboard')
+
+    leaderboard_rows, leaderboard_all = fetch_leaderboard(limit=100)
+    my_rank = next((row for row in leaderboard_all if row['id_number'] == user['id_number']), None)
+    return render_template('leaderboard.html', user=user, leaderboard_rows=leaderboard_rows, my_rank=my_rank)
+
+
+@app.route('/announcements')
+def student_announcements():
+    if 'user' not in session:
+        return redirect('/')
+
+    user = session['user']
+    if is_admin_user():
+        return redirect('/admin')
+
+    return render_template('announcements.html',
+                           user=user,
+                           announcements=fetch_announcements(limit=30, for_user=user))
 
 
 @app.route('/reservation/create', methods=['POST'])

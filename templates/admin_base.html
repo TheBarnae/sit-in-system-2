@@ -30,6 +30,15 @@
             <li><a class="dropdown-item" href="/admin/sit-in-reports">Sit-in Reports</a></li>
             <li><a class="dropdown-item" href="/admin/feedback-reports">Feedback Reports</a></li>
             <li><a class="dropdown-item" href="/admin/reservations">Reservation</a></li>
+            <li><a class="dropdown-item" href="/admin/leaderboard">Leaderboard</a></li>
+            <li>
+              <div class="dropdown-item">
+                <div class="form-check form-switch d-flex align-items-center justify-content-between">
+                  <label class="form-check-label" for="darkModeToggle">Dark Mode</label>
+                  <input class="form-check-input ms-2" type="checkbox" id="darkModeToggle">
+                </div>
+              </div>
+            </li>
             <li><hr class="dropdown-divider"></li>
             <li><a class="dropdown-item" href="/logout">Log out</a></li>
           </ul>
@@ -55,6 +64,27 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
   <script>
+    const storedTheme = localStorage.getItem('theme');
+    if (storedTheme === 'dark') {
+      document.body.classList.add('dark-mode');
+      document.documentElement.classList.add('dark-mode');
+    }
+    const darkToggle = document.getElementById('darkModeToggle');
+    if (darkToggle) {
+      darkToggle.checked = storedTheme === 'dark';
+      darkToggle.addEventListener('change', (event) => {
+        if (event.target.checked) {
+          document.body.classList.add('dark-mode');
+          document.documentElement.classList.add('dark-mode');
+          localStorage.setItem('theme', 'dark');
+        } else {
+          document.body.classList.remove('dark-mode');
+          document.documentElement.classList.remove('dark-mode');
+          localStorage.setItem('theme', 'light');
+        }
+      });
+    }
+
     window.setTimeout(() => {
       document.querySelectorAll('.alert').forEach((alertEl) => {
         alertEl.classList.remove('show');

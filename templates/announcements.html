@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Announcements | CCS Sit-in Monitoring</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="bg-light">
+  <nav class="navbar navbar-dark bg-primary">
+    <div class="container">
+      <a class="navbar-brand" href="/dashboard">
+        <img src="{{ url_for('static', filename='images/CCS_UC.png') }}" alt="Logo" width="30" class="me-2">
+        CCS Sit-in Monitoring
+      </a>
+      <div class="ms-auto d-flex align-items-center gap-2">
+        {% if user.photo_path %}
+          <img class="user-avatar me-2" src="{{ url_for('static', filename=user.photo_path) }}" alt="User photo">
+        {% else %}
+          <span class="user-circle me-2">
+            {{ user.first_name[0] }}{{ user.last_name[0] }}
+          </span>
+        {% endif %}
+        <span class="text-white me-3">Hello, {{ user.first_name }}!</span>
+        <div class="dropdown">
+          <button class="navbar-toggler" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end">
+            <li><a class="dropdown-item" href="/dashboard">Dashboard</a></li>
+            <li><a class="dropdown-item" href="/leaderboard">Leaderboard</a></li>
+            <li><a class="dropdown-item" href="/edit_profile">Edit Profile</a></li>
+            <li><a class="dropdown-item" href="/logout">Log out</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container mt-4 dashboard-shell">
+    <div class="section-head mb-3">
+      <h4 class="section-title">Announcements</h4>
+      <p class="section-subtitle mb-0">All updates and notices from the admin.</p>
+    </div>
+
+    <div class="info-card announcement-card panel-card">
+      {% for announcement in announcements %}
+        <div class="announcement-item">
+          <div class="d-flex justify-content-between">
+            <strong>{{ announcement.author }}</strong>
+            <span class="text-muted small">{{ announcement.date }}</span>
+          </div>
+          <p class="mb-0 text-muted">{{ announcement.body }}</p>
+        </div>
+      {% else %}
+        <p class="text-muted mb-0">No announcements available.</p>
+      {% endfor %}
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    const storedTheme = localStorage.getItem('theme');
+    if (storedTheme === 'dark') {
+      document.body.classList.add('dark-mode');
+      document.documentElement.classList.add('dark-mode');
+    }
+    const darkToggle = document.getElementById('darkModeToggle');
+    if (darkToggle) {
+      darkToggle.checked = storedTheme === 'dark';
+      darkToggle.addEventListener('change', (event) => {
+        if (event.target.checked) {
+          document.body.classList.add('dark-mode');
+          document.documentElement.classList.add('dark-mode');
+          localStorage.setItem('theme', 'dark');
+        } else {
+          document.body.classList.remove('dark-mode');
+          document.documentElement.classList.remove('dark-mode');
+          localStorage.setItem('theme', 'light');
+        }
+      });
+    }
+  </script>
+</body>
+</html>

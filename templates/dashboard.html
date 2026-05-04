@@ -16,6 +16,28 @@
         CCS Sit-in Monitoring
       </a>
       <div class="ms-auto d-flex align-items-center gap-2">
+        <div class="dropdown">
+          <button class="btn btn-sm btn-notify" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Notifications">
+            Notifications
+          </button>
+          <div class="dropdown-menu dropdown-menu-end p-2 notify-menu">
+            <div class="small text-uppercase text-muted fw-semibold px-2 py-1">Notices</div>
+            {% for announcement in announcements %}
+              <div class="notify-item px-2 py-2">
+                <div class="d-flex justify-content-between align-items-center">
+                  <span class="small fw-semibold">
+                    {{ announcement.author }}
+                    {% if announcement.pinned %}<span class="badge text-bg-warning ms-1">Pinned</span>{% endif %}
+                  </span>
+                  <span class="small text-muted">{{ announcement.date }}</span>
+                </div>
+                <div class="small text-muted">{{ announcement.body }}</div>
+              </div>
+            {% else %}
+              <div class="px-2 py-2 small text-muted">No notifications yet.</div>
+            {% endfor %}
+          </div>
+        </div>
         {% if user.photo_path %}
           <img class="user-avatar me-2" src="{{ url_for('static', filename=user.photo_path) }}" alt="User photo">
         {% else %}
@@ -30,6 +52,16 @@
           </button>
           <ul class="dropdown-menu dropdown-menu-end">
             <li><a class="dropdown-item" href="/edit_profile">Edit Profile</a></li>
+            <li><a class="dropdown-item" href="/leaderboard">Leaderboard</a></li>
+            <li><a class="dropdown-item" href="/announcements">Announcements</a></li>
+            <li>
+              <div class="dropdown-item">
+                <div class="form-check form-switch d-flex align-items-center justify-content-between">
+                  <label class="form-check-label" for="darkModeToggle">Dark Mode</label>
+                  <input class="form-check-input ms-2" type="checkbox" id="darkModeToggle">
+                </div>
+              </div>
+            </li>
             <li><a class="dropdown-item" href="/logout">Log out</a></li>
           </ul>
         </div>
@@ -37,7 +69,11 @@
     </div>
   </nav>
 
-  <div class="container mt-4">
+  <div class="container mt-4 dashboard-shell">
+    <div class="section-head mb-3">
+      <h4 class="section-title">Student Dashboard</h4>
+      <p class="section-subtitle mb-0">Track sessions, feedback, reservations, and ranking in one view.</p>
+    </div>
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
         {% for category, message in messages %}
@@ -51,50 +87,94 @@
     <!-- Session summary -->
     <div class="row g-3 mb-4">
       <div class="col-md-4">
-        <div class="info-card text-center stat-card">
+        <div class="info-card text-center stat-card kpi-card kpi-primary">
           <div class="stat-label">Sessions Used</div>
           <div class="stat-value text-primary">{{ sessions_used }}</div>
         </div>
       </div>
       <div class="col-md-4">
-        <div class="info-card text-center stat-card">
+        <div class="info-card text-center stat-card kpi-card kpi-success">
           <div class="stat-label">Remaining</div>
           <div class="stat-value text-success">{{ sessions_remaining }}</div>
         </div>
       </div>
       <div class="col-md-4">
-        <div class="info-card text-center stat-card">
+        <div class="info-card text-center stat-card kpi-card kpi-neutral">
           <div class="stat-label">Total Allowed</div>
           <div class="stat-value">{{ sessions_total }}</div>
         </div>
       </div>
     </div>
 
-    <div class="row g-4 mb-4">
+    {% set pinned_notice = namespace(item=None) %}
+    {% for announcement in announcements %}
+      {% if announcement.pinned and pinned_notice.item is none %}
+        {% set pinned_notice.item = announcement %}
+      {% endif %}
+    {% endfor %}
+
+    <div class="row g-3 mb-4">
       <div class="col-12">
-        <div class="info-card announcement-card">
-          <div class="d-flex justify-content-between align-items-center mb-3">
-            <h5 class="mb-0">Announcements</h5>
-            <span class="text-muted small">Latest updates</span>
-          </div>
-          {% for announcement in announcements %}
-            <div class="announcement-item">
-              <div class="d-flex justify-content-between">
-                <strong>{{ announcement.author }}</strong>
-                <span class="text-muted small">{{ announcement.date }}</span>
-              </div>
-              <p class="mb-0 text-muted">{{ announcement.body }}</p>
+        <div class="info-card panel-card pinned-notice-card">
+          <div class="d-flex justify-content-between align-items-start">
+            <div>
+              <div class="small text-uppercase fw-semibold text-primary mb-1">Pinned Notification</div>
+              {% if pinned_notice.item %}
+                <div class="fw-semibold">{{ pinned_notice.item.author }}</div>
+                <div class="text-muted">{{ pinned_notice.item.body }}</div>
+              {% elif announcements %}
+                <div class="fw-semibold">{{ announcements[0].author }}</div>
+                <div class="text-muted">{{ announcements[0].body }}</div>
+              {% else %}
+                <div class="text-muted">No announcements available.</div>
+              {% endif %}
             </div>
-          {% else %}
-            <p class="text-muted mb-0">No announcements available.</p>
-          {% endfor %}
+            <a class="btn btn-outline-primary btn-sm" href="/announcements">View All</a>
+          </div>
         </div>
       </div>
     </div>
 
     <div class="row g-4 mb-4">
+      <div class="col-lg-3">
+        <div class="info-card panel-card h-100 leaderboard-side-card">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <h5 class="mb-0">Leaderboard</h5>
+            <a class="btn btn-outline-primary btn-sm" href="/leaderboard">Full</a>
+          </div>
+          <div class="rank-chip mb-3">
+            <div class="small text-muted">Your Rank</div>
+            <div class="rank-value">{{ ('#' ~ my_rank.rank) if my_rank else '-' }}</div>
+            <div class="small text-muted">{{ user.last_name }}, {{ user.first_name }}</div>
+          </div>
+          <div class="table-responsive">
+            <table class="table align-middle table-compact mb-0">
+              <thead>
+                <tr>
+                  <th>Rank</th>
+                  <th>Student</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in leaderboard_preview %}
+                  <tr {% if row.id_number == user.id_number %}class="table-primary"{% endif %}>
+                    <td>#{{ row.rank }}</td>
+                    <td>
+                      <div class="fw-semibold">{{ row.full_name }}</div>
+                      <div class="small text-success">{{ row.total_points }} pts</div>
+                    </td>
+                  </tr>
+                {% else %}
+                  <tr><td colspan="2" class="text-center text-muted">No leaderboard data yet.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
       <div class="col-lg-6">
-        <div class="info-card h-100">
+        <div class="info-card h-100 panel-card">
           <h5 class="mb-3">Student Information</h5>
           <table class="info-table w-100">
             <tr><td>ID Number</td><td>{{ user.id_number }}</td></tr>
@@ -104,93 +184,172 @@
             <tr><td>Email</td><td>{{ user.email }}</td></tr>
             <tr><td>Address</td><td>{{ user.address }}</td></tr>
           </table>
+          <hr class="my-3">
+          <div class="sit-summary">
+            <div class="sit-summary-item">
+              <div class="sit-summary-label">Total Sit-in Hours</div>
+              <div class="sit-summary-value">{{ sit_in_summary.total_hours }}</div>
+            </div>
+            <div class="sit-summary-item">
+              <div class="sit-summary-label">Number of Sessions</div>
+              <div class="sit-summary-value">{{ sit_in_summary.total_sessions }}</div>
+            </div>
+            <div class="sit-summary-item">
+              <div class="sit-summary-label">Average Session Duration</div>
+              <div class="sit-summary-value">{{ sit_in_summary.avg_duration }}</div>
+            </div>
+            <div class="sit-summary-item">
+              <div class="sit-summary-label">Longest Session</div>
+              <div class="sit-summary-value">{{ sit_in_summary.longest_duration }}</div>
+            </div>
+          </div>
         </div>
       </div>
-      <div class="col-lg-6">
-        <div class="info-card h-100">
-          <div class="d-flex justify-content-between align-items-center mb-3">
-            <h5 class="mb-0">Recent Sessions</h5>
-            <span class="text-muted small">Last 5 entries</span>
-          </div>
-          <div class="table-responsive">
-            <table class="table align-middle">
-              <thead>
-                <tr>
-                  <th>Lab</th>
-                  <th>Purpose</th>
-                  <th>Started</th>
-                  <th>Status</th>
-                  <th>Feedback</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% if recent_sessions %}
-                  {% for session_item in recent_sessions %}
-                    <tr>
-                      <td>{{ session_item.lab_label }}</td>
-                      <td>{{ session_item.purpose or 'General use' }}</td>
-                      <td>
-                        {{ session_item.started_at.strftime('%b %d, %I:%M %p') if session_item.started_at }}<br>
-                        {% if session_item.ended_at %}<span class="text-muted small">Ended {{ session_item.ended_at.strftime('%I:%M %p') }}</span>{% endif %}
-                      </td>
-                      <td>
-                        <span class="status-pill status-{{ session_item.status }}">
-                          {{ session_item.status | capitalize }}
-                        </span>
-                      </td>
-                      <td>
-                        {% if session_item.status == 'completed' and not session_item.feedback_id %}
-                          <button class="btn btn-sm btn-outline-primary px-2 py-0" style="font-size: 0.75rem;" type="button" data-bs-toggle="collapse" data-bs-target="#feedbackForm{{ session_item.id }}" aria-expanded="false" aria-controls="feedbackForm{{ session_item.id }}">
-                            Give Feedback
-                          </button>
-                        {% elif session_item.feedback_id %}
-                          <span class="text-success small">Submitted</span>
-                        {% else %}
-                          <span class="text-muted small">Unavailable</span>
-                        {% endif %}
-                      </td>
-                    </tr>
-                    {% if session_item.status == 'completed' and not session_item.feedback_id %}
-                    <tr class="collapse" id="feedbackForm{{ session_item.id }}">
-                      <td colspan="5">
-                        <form class="row g-2" method="POST" action="/feedback/submit">
-                          <input type="hidden" name="sit_in_log_id" value="{{ session_item.id }}">
-                          <div class="col-md-3">
-                            <select class="form-select" name="rating" required>
-                              <option value="" selected disabled>Select rating (1-5)</option>
-                              <option value="1">1 - Bad</option>
-                              <option value="2">2 - Poor</option>
-                              <option value="3">3 - Okay</option>
-                              <option value="4">4 - Good</option>
-                              <option value="5">5 - Excellent</option>
-                            </select>
-                          </div>
-                          <div class="col-md-7">
-                            <input type="text" class="form-control" name="feedback_text" placeholder="Share your feedback" required>
-                          </div>
-                          <div class="col-md-2 d-grid">
-                            <button class="btn btn-primary" type="submit">Submit</button>
-                          </div>
-                        </form>
-                      </td>
-                    </tr>
-                    {% endif %}
-                  {% endfor %}
-                {% else %}
+
+      <div class="col-lg-3">
+        <div class="info-card panel-card h-100">
+          <div class="stack-card">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h6 class="mb-0">Recent Session</h6>
+            </div>
+            <div class="table-responsive">
+              <table class="table align-middle table-compact mb-0">
+                <thead>
                   <tr>
-                    <td colspan="5" class="text-center text-muted">No sit-in history yet.</td>
+                    <th>Lab</th>
+                    <th>Status</th>
                   </tr>
-                {% endif %}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {% if recent_sessions %}
+                    {% for session_item in recent_sessions %}
+                      <tr>
+                        <td>
+                          <div>{{ session_item.lab_label }}</div>
+                          <div class="small text-muted">{{ session_item.purpose or 'General use' }}</div>
+                        </td>
+                        <td>
+                          <span class="status-pill status-{{ session_item.status }}">
+                            {{ session_item.status | capitalize }}
+                          </span>
+                        </td>
+                      </tr>
+                    {% endfor %}
+                  {% else %}
+                    <tr><td colspan="2" class="text-center text-muted">No recent sessions.</td></tr>
+                  {% endif %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="stack-card mt-3 pt-3 border-top">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h6 class="mb-0">Reservation Logs</h6>
+            </div>
+            <div class="table-responsive">
+              <table class="table align-middle table-compact mb-0">
+                <thead>
+                  <tr>
+                    <th>PC</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% if reservation_logs %}
+                    {% for row in reservation_logs %}
+                      <tr>
+                        <td>
+                          <div>{{ row.lab_label }}</div>
+                          <div class="small text-muted">PC {{ row.seat_no }}</div>
+                        </td>
+                        <td><span class="status-pill status-{{ row.status }}">{{ row.status|capitalize }}</span></td>
+                      </tr>
+                    {% endfor %}
+                  {% else %}
+                    <tr><td colspan="2" class="text-center text-muted">No reservation logs yet.</td></tr>
+                  {% endif %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="stack-card mt-3 pt-3 border-top">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h6 class="mb-0">Session Feedback</h6>
+              <span class="text-muted small">Completed only</span>
+            </div>
+            <div class="feedback-scroll-panel">
+              <table class="table align-middle table-compact mb-0">
+                <thead>
+                  <tr>
+                    <th>Lab</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% if recent_sessions %}
+                    {% for session_item in recent_sessions %}
+                      <tr>
+                        <td>
+                          <div>{{ session_item.lab_label }}</div>
+                          <div class="small text-muted">{{ session_item.purpose or 'General use' }}</div>
+                        </td>
+                        <td>
+                          {% if session_item.status == 'completed' and not session_item.feedback_id %}
+                            <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#feedbackForm{{ session_item.id }}" aria-expanded="false" aria-controls="feedbackForm{{ session_item.id }}">
+                              Give
+                            </button>
+                          {% elif session_item.feedback_id %}
+                            <span class="text-success small d-block">Submitted</span>
+                            {% if session_item.points_awarded %}
+                              <span class="small text-success">+{{ session_item.points_awarded }} pts</span>
+                            {% endif %}
+                          {% else %}
+                            <span class="text-muted small">N/A</span>
+                          {% endif %}
+                        </td>
+                      </tr>
+                      {% if session_item.status == 'completed' and not session_item.feedback_id %}
+                      <tr class="collapse" id="feedbackForm{{ session_item.id }}">
+                        <td colspan="2">
+                          <form class="row g-2" method="POST" action="/feedback/submit">
+                            <input type="hidden" name="sit_in_log_id" value="{{ session_item.id }}">
+                            <div class="col-12">
+                              <select class="form-select form-select-sm" name="rating" required>
+                                <option value="" selected disabled>Select rating (1-5)</option>
+                                <option value="1">1 - Bad</option>
+                                <option value="2">2 - Poor</option>
+                                <option value="3">3 - Okay</option>
+                                <option value="4">4 - Good</option>
+                                <option value="5">5 - Excellent</option>
+                              </select>
+                            </div>
+                            <div class="col-12">
+                              <input type="text" class="form-control form-control-sm" name="feedback_text" placeholder="Share your feedback for admin" required>
+                            </div>
+                            <div class="col-12 d-grid">
+                              <button class="btn btn-sm btn-primary" type="submit">Submit</button>
+                            </div>
+                          </form>
+                        </td>
+                      </tr>
+                      {% endif %}
+                    {% endfor %}
+                  {% else %}
+                    <tr><td colspan="2" class="text-center text-muted">No sessions yet.</td></tr>
+                  {% endif %}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
     </div>
 
     <div class="row g-4 mb-4">
-      <div class="col-lg-7">
-        <div class="info-card h-100">
+      <div class="col-12">
+        <div class="info-card h-100 panel-card">
           <div class="d-flex justify-content-between align-items-center mb-3">
             <h5 class="mb-0">Advance Reservation</h5>
             <button class="btn btn-primary btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#reservationModal">Reserve Seat</button>
@@ -206,45 +365,6 @@
                 PC {{ seat.seat_no }}
               </div>
             {% endfor %}
-          </div>
-        </div>
-      </div>
-
-      <div class="col-lg-5">
-        <div class="info-card h-100">
-          <div class="d-flex justify-content-between align-items-center mb-3">
-            <h5 class="mb-0">Reservation Logs</h5>
-            <span class="text-muted small">Last 8 entries</span>
-          </div>
-          <div class="table-responsive">
-            <table class="table align-middle">
-              <thead>
-                <tr>
-                  <th>Lab/PC</th>
-                  <th>Schedule</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% if reservation_logs %}
-                  {% for row in reservation_logs %}
-                    <tr>
-                      <td>
-                        <div>{{ row.lab_label }}</div>
-                        <div class="small text-muted">PC {{ row.seat_no }} | {{ row.purpose }}</div>
-                      </td>
-                      <td>
-                        <div>{{ row.reservation_date.strftime('%b %d, %Y') if row.reservation_date }}</div>
-                        <div class="small text-muted">{{ row.reservation_slot }}</div>
-                      </td>
-                      <td><span class="status-pill status-{{ row.status }}">{{ row.status|capitalize }}</span></td>
-                    </tr>
-                  {% endfor %}
-                {% else %}
-                  <tr><td colspan="3" class="text-center text-muted">No reservation logs yet.</td></tr>
-                {% endif %}
-              </tbody>
-            </table>
           </div>
         </div>
       </div>
@@ -316,6 +436,27 @@
   </div>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
   <script>
+    const storedTheme = localStorage.getItem('theme');
+    if (storedTheme === 'dark') {
+      document.body.classList.add('dark-mode');
+      document.documentElement.classList.add('dark-mode');
+    }
+    const darkToggle = document.getElementById('darkModeToggle');
+    if (darkToggle) {
+      darkToggle.checked = storedTheme === 'dark';
+      darkToggle.addEventListener('change', (event) => {
+        if (event.target.checked) {
+          document.body.classList.add('dark-mode');
+          document.documentElement.classList.add('dark-mode');
+          localStorage.setItem('theme', 'dark');
+        } else {
+          document.body.classList.remove('dark-mode');
+          document.documentElement.classList.remove('dark-mode');
+          localStorage.setItem('theme', 'light');
+        }
+      });
+    }
+
     const seatGrid = document.getElementById('reserveSeatGrid');
     const reserveLab = document.getElementById('reserveLab');
     const reserveDate = document.getElementById('reserveDate');

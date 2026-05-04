@@ -15,7 +15,11 @@
             <th>Lab</th>
             <th>Purpose</th>
             <th>Rating</th>
-            <th>Feedback</th>
+            <th>Student Feedback</th>
+            <th>Admin Review</th>
+            <th>Reason</th>
+            <th>Points</th>
+            <th>Action</th>
           </tr>
         </thead>
         <tbody>
@@ -31,6 +35,51 @@
               <td>{{ row.purpose or 'General use' }}</td>
               <td>{{ row.rating if row.rating else '-' }}</td>
               <td>{{ row.feedback_text }}</td>
+              <td>
+                {% if row.admin_feedback_text %}
+                  <div>{{ row.admin_feedback_text }}</div>
+                  <div class="small text-muted mt-1">
+                    {{ row.tidiness_status|replace('_', ' ')|title if row.tidiness_status else 'Not tagged' }}
+                  </div>
+                {% else %}
+                  <span class="text-muted small">No admin review yet</span>
+                {% endif %}
+              </td>
+              <td>{{ row.admin_points_reason or '-' }}</td>
+              <td>
+                <span class="fw-semibold text-success">{{ row.points_awarded or 0 }}</span>
+              </td>
+              <td>
+                <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#adminReview{{ row.id }}" aria-expanded="false" aria-controls="adminReview{{ row.id }}">
+                  {% if row.admin_feedback_text or row.points_awarded %}Update{% else %}Review{% endif %}
+                </button>
+              </td>
+            </tr>
+            <tr class="collapse" id="adminReview{{ row.id }}">
+              <td colspan="11">
+                <form class="row g-2" method="POST" action="/admin/feedback/{{ row.id }}/review">
+                  <div class="col-md-4">
+                    <input type="text" class="form-control" name="admin_feedback_text" placeholder="Feedback to student" value="{{ row.admin_feedback_text or '' }}" required>
+                  </div>
+                  <div class="col-md-3">
+                    <input type="text" class="form-control" name="admin_points_reason" placeholder="Reason for points" value="{{ row.admin_points_reason or '' }}" required>
+                  </div>
+                  <div class="col-md-2">
+                    <select class="form-select" name="tidiness_status">
+                      <option value="" {% if not row.tidiness_status %}selected{% endif %}>Criteria tag (optional)</option>
+                      <option value="tidy" {% if row.tidiness_status == 'tidy' %}selected{% endif %}>Tidy</option>
+                      <option value="not_tidy" {% if row.tidiness_status == 'not_tidy' %}selected{% endif %}>Not tidy</option>
+                    </select>
+                  </div>
+                  <div class="col-md-1">
+                    <input type="number" min="0" max="100" class="form-control" name="points_awarded" placeholder="Points" value="{{ row.points_awarded or 0 }}">
+                  </div>
+                  <div class="col-md-2 d-grid">
+                    <button class="btn btn-success" type="submit">Save</button>
+                  </div>
+                </form>
+                <div class="small text-muted mt-2">Admin comment and reason are required. Tidiness is only an optional criteria tag.</div>
+              </td>
             </tr>
           {% endfor %}
         </tbody>

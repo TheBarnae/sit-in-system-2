@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Leaderboard | CCS Sit-in Monitoring</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="bg-light">
+  <nav class="navbar navbar-dark bg-primary">
+    <div class="container">
+      <a class="navbar-brand" href="/dashboard">
+        <img src="{{ url_for('static', filename='images/CCS_UC.png') }}" alt="Logo" width="30" class="me-2">
+        CCS Sit-in Monitoring
+      </a>
+      <div class="ms-auto d-flex align-items-center gap-2">
+        {% if user.photo_path %}
+          <img class="user-avatar me-2" src="{{ url_for('static', filename=user.photo_path) }}" alt="User photo">
+        {% else %}
+          <span class="user-circle me-2">
+            {{ user.first_name[0] }}{{ user.last_name[0] }}
+          </span>
+        {% endif %}
+        <span class="text-white me-3">Hello, {{ user.first_name }}!</span>
+        <div class="dropdown">
+          <button class="navbar-toggler" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end">
+            <li><a class="dropdown-item" href="/dashboard">Dashboard</a></li>
+            <li><a class="dropdown-item" href="/edit_profile">Edit Profile</a></li>
+            <li><a class="dropdown-item" href="/logout">Log out</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container mt-4">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <div class="info-card mb-4">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="mb-0">Leaderboard</h5>
+        <span class="small text-muted">Earned points, total sit-in hours, and completed sessions</span>
+      </div>
+
+      {% if my_rank %}
+        <div class="alert alert-primary">
+          Your current standing: <strong>#{{ my_rank.rank }}</strong>
+          with <strong>{{ my_rank.total_points }}</strong> point(s),
+          <strong>{{ '%.2f'|format(my_rank.total_hours) }}</strong> total hours,
+          and <strong>{{ my_rank.completed_sessions }}</strong> completed session(s).
+        </div>
+      {% endif %}
+
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead>
+            <tr>
+              <th>Rank</th>
+              <th>Student</th>
+              <th>Earned Points</th>
+              <th>Total Sit-in Hours</th>
+              <th>Task Completed</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in leaderboard_rows %}
+              <tr {% if row.id_number == user.id_number %}class="table-primary"{% endif %}>
+                <td class="fw-semibold">#{{ row.rank }}</td>
+                <td>
+                  <div class="fw-semibold">{{ row.full_name }}</div>
+                  <div class="small text-muted">{{ row.id_number }} | {{ row.course or '-' }} {{ row.course_level or '' }}</div>
+                </td>
+                <td class="text-success fw-semibold">{{ row.total_points }}</td>
+                <td>{{ '%.2f'|format(row.total_hours) }}</td>
+                <td>{{ row.completed_sessions }}</td>
+              </tr>
+            {% else %}
+              <tr>
+                <td colspan="5" class="text-center text-muted">No leaderboard data available yet.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    const storedTheme = localStorage.getItem('theme');
+    if (storedTheme === 'dark') {
+      document.body.classList.add('dark-mode');
+      document.documentElement.classList.add('dark-mode');
+    }
+    const darkToggle = document.getElementById('darkModeToggle');
+    if (darkToggle) {
+      darkToggle.checked = storedTheme === 'dark';
+      darkToggle.addEventListener('change', (event) => {
+        if (event.target.checked) {
+          document.body.classList.add('dark-mode');
+          document.documentElement.classList.add('dark-mode');
+          localStorage.setItem('theme', 'dark');
+        } else {
+          document.body.classList.remove('dark-mode');
+          document.documentElement.classList.remove('dark-mode');
+          localStorage.setItem('theme', 'light');
+        }
+      });
+    }
+
+    window.setTimeout(() => {
+      document.querySelectorAll('.alert').forEach((alertEl) => {
+        alertEl.classList.remove('show');
+        alertEl.classList.add('fade');
+        window.setTimeout(() => alertEl.remove(), 300);
+      });
+    }, 7000);
+  </script>
+</body>
+</html>
