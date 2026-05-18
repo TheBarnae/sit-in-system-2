@@ -18,10 +18,34 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 TOTAL_SESSION_LIMIT = 30
 
 LABS = [
-    {'code': 'LAB524', 'label': 'Laboratory 524', 'description': 'Main programming laboratory', 'capacity': 50},
-    {'code': 'LAB526', 'label': 'Laboratory 526', 'description': 'Software development laboratory', 'capacity': 50},
-    {'code': 'LAB528', 'label': 'Laboratory 528', 'description': 'Systems and networking laboratory', 'capacity': 50},
-    {'code': 'LAB530', 'label': 'Laboratory 530', 'description': 'Capstone and research laboratory', 'capacity': 50},
+    {
+        'code': 'LAB524',
+        'label': 'Laboratory 524',
+        'description': 'Main programming laboratory',
+        'capacity': 50,
+        'software': ['Python', 'VS Code', 'Cisco Packet Tracer']
+    },
+    {
+        'code': 'LAB526',
+        'label': 'Laboratory 526',
+        'description': 'Software development laboratory',
+        'capacity': 50,
+        'software': ['Java', 'MySQL', 'VS Code']
+    },
+    {
+        'code': 'LAB528',
+        'label': 'Laboratory 528',
+        'description': 'Systems and networking laboratory',
+        'capacity': 50,
+        'software': ['Cisco Packet Tracer', 'Wireshark', 'Linux Tools']
+    },
+    {
+        'code': 'LAB530',
+        'label': 'Laboratory 530',
+        'description': 'Capstone and research laboratory',
+        'capacity': 50,
+        'software': ['Python', 'VS Code', 'Research Tools']
+    },
 ]
 
 RESERVATION_SLOTS = [
@@ -503,14 +527,16 @@ def fetch_leaderboard(limit=10):
             u.middle_name,
             u.course,
             u.course_level,
-            COALESCE(stats.total_points, 0) AS total_points,
+            COALESCE(stats.admin_points, 0) AS admin_points,
             COALESCE(stats.completed_sessions, 0) AS completed_sessions,
-            COALESCE(stats.total_minutes, 0) AS total_minutes
+            COALESCE(stats.total_minutes, 0) AS total_minutes,
+            COALESCE(stats.average_minutes, 0) AS average_minutes,
+            COALESCE(stats.total_minutes, 0) AS total_minutes_for_sort
         FROM users u
         LEFT JOIN (
             SELECT
                 s.student_id_number,
-                SUM(COALESCE(f.points_awarded, 0)) AS total_points,
+                SUM(COALESCE(f.points_awarded, 0)) AS admin_points,
                 SUM(CASE WHEN s.status='completed' THEN 1 ELSE 0 END) AS completed_sessions,
                 SUM(
                     CASE
@@ -518,13 +544,24 @@ def fetch_leaderboard(limit=10):
                             THEN TIMESTAMPDIFF(MINUTE, s.started_at, s.ended_at)
                         ELSE 0
                     END
-                ) AS total_minutes
+                ) AS total_minutes,
+                CASE
+                    WHEN SUM(CASE WHEN s.status='completed' AND s.ended_at IS NOT NULL THEN 1 ELSE 0 END) > 0
+                        THEN SUM(
+                            CASE
+                                WHEN s.status='completed' AND s.ended_at IS NOT NULL
+                                    THEN TIMESTAMPDIFF(MINUTE, s.started_at, s.ended_at)
+                                ELSE 0
+                            END
+                        ) / SUM(CASE WHEN s.status='completed' AND s.ended_at IS NOT NULL THEN 1 ELSE 0 END)
+                    ELSE 0
+                END AS average_minutes
             FROM sit_in_logs s
             LEFT JOIN user_feedback f ON f.sit_in_log_id = s.id
             GROUP BY s.student_id_number
         ) stats ON stats.student_id_number = u.id_number
         WHERE u.id_number NOT LIKE 'adm-%'
-        ORDER BY total_points DESC, completed_sessions DESC, total_minutes DESC, u.last_name ASC, u.first_name ASC
+        ORDER BY average_minutes DESC, completed_sessions DESC, total_minutes DESC, u.last_name ASC, u.first_name ASC
     """)
     rows = cursor.fetchall()
     cursor.close()
@@ -534,8 +571,13 @@ def fetch_leaderboard(limit=10):
         row['rank'] = index
         middle_name = f" {row['middle_name']}" if row.get('middle_name') else ''
         row['full_name'] = f"{row.get('last_name') or ''}, {row.get('first_name') or ''}{middle_name}".strip(', ')
-        minutes = row.get('total_minutes') or 0
-        row['total_hours'] = round(minutes / 60, 2)
+        total_minutes = row.get('total_minutes') or 0
+        average_minutes = row.get('average_minutes') or 0
+        row['total_hours'] = round(total_minutes / 60, 2)
+        row['average_hours'] = round(average_minutes / 60, 2)
+        time_points = int(average_minutes // 30)
+        row['admin_points'] = int(row.get('admin_points') or 0)
+        row['total_points'] = time_points + row['admin_points']
 
     return rows[:safe_limit], rows
 
@@ -2222,6 +2264,10 @@ def dashboard():
 
     leaderboard_preview, leaderboard_all = fetch_leaderboard(limit=8)
     my_rank = next((row for row in leaderboard_all if row['id_number'] == user['id_number']), None)
+    announcements = fetch_announcements(limit=10, for_user=user)
+    latest_announcement_id = announcements[0]['id'] if announcements else 0
+    last_seen_announcement_id = session.get('last_seen_announcement_id', 0)
+    has_new_notifications = bool(latest_announcement_id and latest_announcement_id > last_seen_announcement_id)
 
     return render_template('dashboard.html',
                            user=user,
@@ -2230,7 +2276,8 @@ def dashboard():
                            sessions_total=TOTAL_SESSION_LIMIT,
                            active_session=active_session,
                            lab_cards=lab_cards,
-                           announcements=fetch_announcements(limit=10, for_user=user),
+                           announcements=announcements,
+                           has_new_notifications=has_new_notifications,
                            recent_sessions=recent_sessions,
                            can_start_session=can_start_session,
                            labs=LABS,
@@ -2269,9 +2316,24 @@ def student_announcements():
     if is_admin_user():
         return redirect('/admin')
 
+    announcements = fetch_announcements(limit=30, for_user=user)
+    if announcements:
+        session['last_seen_announcement_id'] = announcements[0]['id']
     return render_template('announcements.html',
                            user=user,
-                           announcements=fetch_announcements(limit=30, for_user=user))
+                           announcements=announcements)
+
+
+@app.route('/notifications/mark-seen', methods=['POST'])
+def mark_notifications_seen():
+    if 'user' not in session:
+        return jsonify({'ok': False}), 401
+
+    user = session['user']
+    announcements = fetch_announcements(limit=1, for_user=user)
+    if announcements:
+        session['last_seen_announcement_id'] = announcements[0]['id']
+    return jsonify({'ok': True})
 
 
 @app.route('/reservation/create', methods=['POST'])

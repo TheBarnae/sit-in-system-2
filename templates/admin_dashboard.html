@@ -53,6 +53,7 @@
             <tr>
               <th>Rank</th>
               <th>Student</th>
+              <th>Avg Time</th>
               <th>Pts</th>
             </tr>
           </thead>
@@ -64,11 +65,12 @@
                   <div class="fw-semibold">{{ row.full_name }}</div>
                   <div class="small text-muted">{{ row.completed_sessions }} completed</div>
                 </td>
+                <td>{{ '%.2f'|format(row.average_hours) }}</td>
                 <td class="fw-semibold text-success">{{ row.total_points }}</td>
               </tr>
             {% else %}
               <tr>
-                <td colspan="3" class="text-center text-muted">No leaderboard data yet.</td>
+                <td colspan="4" class="text-center text-muted">No leaderboard data yet.</td>
               </tr>
             {% endfor %}
           </tbody>

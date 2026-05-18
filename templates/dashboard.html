@@ -17,8 +17,11 @@
       </a>
       <div class="ms-auto d-flex align-items-center gap-2">
         <div class="dropdown">
-          <button class="btn btn-sm btn-notify" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Notifications">
+          <button class="btn btn-sm btn-notify{% if has_new_notifications %} has-dot{% endif %}" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Notifications" id="notifyDropdown">
             Notifications
+            {% if has_new_notifications %}
+              <span class="notify-dot" aria-hidden="true"></span>
+            {% endif %}
           </button>
           <div class="dropdown-menu dropdown-menu-end p-2 notify-menu">
             <div class="small text-uppercase text-muted fw-semibold px-2 py-1">Notices</div>
@@ -106,35 +109,6 @@
       </div>
     </div>
 
-    {% set pinned_notice = namespace(item=None) %}
-    {% for announcement in announcements %}
-      {% if announcement.pinned and pinned_notice.item is none %}
-        {% set pinned_notice.item = announcement %}
-      {% endif %}
-    {% endfor %}
-
-    <div class="row g-3 mb-4">
-      <div class="col-12">
-        <div class="info-card panel-card pinned-notice-card">
-          <div class="d-flex justify-content-between align-items-start">
-            <div>
-              <div class="small text-uppercase fw-semibold text-primary mb-1">Pinned Notification</div>
-              {% if pinned_notice.item %}
-                <div class="fw-semibold">{{ pinned_notice.item.author }}</div>
-                <div class="text-muted">{{ pinned_notice.item.body }}</div>
-              {% elif announcements %}
-                <div class="fw-semibold">{{ announcements[0].author }}</div>
-                <div class="text-muted">{{ announcements[0].body }}</div>
-              {% else %}
-                <div class="text-muted">No announcements available.</div>
-              {% endif %}
-            </div>
-            <a class="btn btn-outline-primary btn-sm" href="/announcements">View All</a>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <div class="row g-4 mb-4">
       <div class="col-lg-3">
         <div class="info-card panel-card h-100 leaderboard-side-card">
@@ -153,6 +127,7 @@
                 <tr>
                   <th>Rank</th>
                   <th>Student</th>
+                  <th>Avg Time</th>
                 </tr>
               </thead>
               <tbody>
@@ -163,9 +138,10 @@
                       <div class="fw-semibold">{{ row.full_name }}</div>
                       <div class="small text-success">{{ row.total_points }} pts</div>
                     </td>
+                    <td>{{ '%.2f'|format(row.average_hours) }}</td>
                   </tr>
                 {% else %}
-                  <tr><td colspan="2" class="text-center text-muted">No leaderboard data yet.</td></tr>
+                  <tr><td colspan="3" class="text-center text-muted">No leaderboard data yet.</td></tr>
                 {% endfor %}
               </tbody>
             </table>
@@ -277,7 +253,6 @@
           <div class="stack-card mt-3 pt-3 border-top">
             <div class="d-flex justify-content-between align-items-center mb-2">
               <h6 class="mb-0">Session Feedback</h6>
-              <span class="text-muted small">Completed only</span>
             </div>
             <div class="feedback-scroll-panel">
               <table class="table align-middle table-compact mb-0">
@@ -419,12 +394,26 @@
                 </div>
               </div>
 
-              <div class="seat-legend mb-2">
-                <span class="seat-badge seat-available"></span> Available
-                <span class="seat-badge seat-taken ms-3"></span> Taken
-              </div>
-              <div class="seat-grid-shell">
-                <div id="reserveSeatGrid" class="seat-grid"></div>
+              <div class="row g-3">
+                <div class="col-lg-8">
+                  <div class="seat-legend mb-2">
+                    <span class="seat-badge seat-available"></span> Available
+                    <span class="seat-badge seat-taken ms-3"></span> Taken
+                  </div>
+                  <div class="seat-grid-shell">
+                    <div id="reserveSeatGrid" class="seat-grid"></div>
+                  </div>
+                </div>
+                <div class="col-lg-4">
+                  <div class="lab-overview-card" id="labOverviewCard" data-labs='{{ labs | tojson }}'>
+                    <div class="lab-overview-title" id="labOverviewTitle">Lab Overview</div>
+                    <div class="lab-overview-desc text-muted" id="labOverviewDesc">Select a laboratory to view details.</div>
+                    <div class="lab-overview-subtitle">Software</div>
+                    <ul class="lab-overview-list" id="labOverviewList">
+                      <li class="text-muted">No software listed.</li>
+                    </ul>
+                  </div>
+                </div>
               </div>
             </div>
             <div class="modal-footer">
@@ -466,7 +455,30 @@
     const selectedSeatLabel = document.getElementById('selectedSeatLabel');
     const selectedSeatInput = document.getElementById('selectedSeatInput');
     const submitReservationBtn = document.getElementById('submitReservationBtn');
+    const labOverviewTitle = document.getElementById('labOverviewTitle');
+    const labOverviewDesc = document.getElementById('labOverviewDesc');
+    const labOverviewList = document.getElementById('labOverviewList');
+    const labOverviewCard = document.getElementById('labOverviewCard');
+    const labMeta = labOverviewCard ? JSON.parse(labOverviewCard.dataset.labs || '[]') : [];
     let selectedSeatNo = '';
+
+    function renderLabOverview(labCode) {
+      const lab = labMeta.find((item) => item.code === labCode);
+      if (!lab) {
+        labOverviewTitle.textContent = 'Lab Overview';
+        labOverviewDesc.textContent = 'Select a laboratory to view details.';
+        labOverviewList.innerHTML = '<li class="text-muted">No software listed.</li>';
+        return;
+      }
+      labOverviewTitle.textContent = `${lab.label}`;
+      labOverviewDesc.textContent = lab.description || '';
+      const software = lab.software || [];
+      if (!software.length) {
+        labOverviewList.innerHTML = '<li class="text-muted">No software listed.</li>';
+        return;
+      }
+      labOverviewList.innerHTML = software.map((item) => `<li>${item}</li>`).join('');
+    }
 
     function resetSelectedSeat() {
       selectedSeatNo = '';
@@ -542,10 +554,14 @@
       const data = await response.json();
       renderSeatButtons(data.seats || []);
 
+      renderLabOverview(reserveLab.value);
+
       if (preserveSelection && currentSelectedSeat) {
         restoreSelectedSeat(data.seats || []);
       }
     }
+
+    renderLabOverview(reserveLab.value);
 
     ['change', 'input'].forEach((eventName) => {
       reserveLab.addEventListener(eventName, () => refreshSeatAvailability({ preserveSelection: false }));
@@ -574,6 +590,19 @@
         window.setTimeout(() => alertEl.remove(), 300);
       });
     }, 7000);
+
+    const notifyButton = document.getElementById('notifyDropdown');
+    if (notifyButton) {
+      notifyButton.addEventListener('show.bs.dropdown', () => {
+        fetch('/notifications/mark-seen', { method: 'POST' }).then(() => {
+          const dot = notifyButton.querySelector('.notify-dot');
+          if (dot) {
+            dot.remove();
+          }
+          notifyButton.classList.remove('has-dot');
+        }).catch(() => {});
+      });
+    }
   </script>
 </body>
 </html>

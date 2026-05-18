@@ -59,6 +59,7 @@
         <div class="alert alert-primary">
           Your current standing: <strong>#{{ my_rank.rank }}</strong>
           with <strong>{{ my_rank.total_points }}</strong> point(s),
+          <strong>{{ '%.2f'|format(my_rank.average_hours) }}</strong> average hours,
           <strong>{{ '%.2f'|format(my_rank.total_hours) }}</strong> total hours,
           and <strong>{{ my_rank.completed_sessions }}</strong> completed session(s).
         </div>
@@ -71,6 +72,7 @@
               <th>Rank</th>
               <th>Student</th>
               <th>Earned Points</th>
+              <th>Average Time</th>
               <th>Total Sit-in Hours</th>
               <th>Task Completed</th>
             </tr>
@@ -84,12 +86,13 @@
                   <div class="small text-muted">{{ row.id_number }} | {{ row.course or '-' }} {{ row.course_level or '' }}</div>
                 </td>
                 <td class="text-success fw-semibold">{{ row.total_points }}</td>
+                <td>{{ '%.2f'|format(row.average_hours) }}</td>
                 <td>{{ '%.2f'|format(row.total_hours) }}</td>
                 <td>{{ row.completed_sessions }}</td>
               </tr>
             {% else %}
               <tr>
-                <td colspan="5" class="text-center text-muted">No leaderboard data available yet.</td>
+                <td colspan="6" class="text-center text-muted">No leaderboard data available yet.</td>
               </tr>
             {% endfor %}
           </tbody>

@@ -5,7 +5,7 @@
 <div class="info-card">
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h5 class="mb-0">Student Leaderboard</h5>
-    <span class="small text-muted">Points, hours, and completed sessions</span>
+    <span class="small text-muted">Points, average time, hours, and completed sessions</span>
   </div>
 
   <div class="table-responsive">
@@ -16,6 +16,7 @@
           <th>Student</th>
           <th>Course</th>
           <th>Earned Points</th>
+          <th>Average Time</th>
           <th>Total Sit-in Hours</th>
           <th>Task Completed</th>
         </tr>
@@ -30,12 +31,13 @@
             </td>
             <td>{{ row.course or '-' }} {{ row.course_level or '' }}</td>
             <td class="text-success fw-semibold">{{ row.total_points }}</td>
+            <td>{{ '%.2f'|format(row.average_hours) }}</td>
             <td>{{ '%.2f'|format(row.total_hours) }}</td>
             <td>{{ row.completed_sessions }}</td>
           </tr>
         {% else %}
           <tr>
-            <td colspan="6" class="text-center text-muted">No leaderboard data available.</td>
+            <td colspan="7" class="text-center text-muted">No leaderboard data available.</td>
           </tr>
         {% endfor %}
       </tbody>
