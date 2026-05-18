@@ -63,9 +63,8 @@
   const submitButton = document.getElementById('sitInSubmit');
   const messageBox = document.getElementById('lookupMessage');
 
-  const initialActive = form.dataset.initialActive === '1';
   const initialRemaining = form.dataset.initialRemaining === '' ? null : Number(form.dataset.initialRemaining);
-  if (!idInput.value.trim() || initialActive || initialRemaining === 0) {
+  if (!idInput.value.trim() || initialRemaining === 0) {
     submitButton.disabled = true;
   }
 
@@ -111,12 +110,6 @@
       nameInput.value = data.student.full_name || '';
       courseInput.value = [data.student.course, data.student.course_level].filter(Boolean).join(' - ');
       remainingInput.value = data.remaining_sessions;
-
-      if (data.active_session) {
-        setMessage(`Student already has an active sit-in (${data.active_session.lab_label}).`, 'warning');
-        submitButton.disabled = true;
-        return;
-      }
 
       if (data.remaining_sessions <= 0) {
         setMessage('No remaining sessions available.', 'warning');

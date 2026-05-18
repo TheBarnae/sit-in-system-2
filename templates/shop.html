@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rewards Shop | CCS Sit-in Monitoring</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="bg-light">
+  <nav class="navbar navbar-dark bg-primary">
+    <div class="container">
+      <a class="navbar-brand" href="/dashboard">
+        <img src="{{ url_for('static', filename='images/CCS_UC.png') }}" alt="Logo" width="30" class="me-2">
+        CCS Sit-in Monitoring
+      </a>
+      <div class="ms-auto d-flex align-items-center gap-2">
+        {% if user.photo_path %}
+          <img class="user-avatar me-2" src="{{ url_for('static', filename=user.photo_path) }}" alt="User photo">
+        {% else %}
+          <span class="user-circle me-2">
+            {{ user.first_name[0] }}{{ user.last_name[0] }}
+          </span>
+        {% endif %}
+        <span class="text-white me-3">Hello, {{ user.first_name }}!</span>
+        <div class="dropdown">
+          <button class="navbar-toggler" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end">
+            <li><a class="dropdown-item" href="/dashboard">Dashboard</a></li>
+            <li><a class="dropdown-item" href="/leaderboard">Leaderboard</a></li>
+            <li><a class="dropdown-item" href="/announcements">Announcements</a></li>
+            <li><a class="dropdown-item" href="/shop">Rewards Shop</a></li>
+            <li><a class="dropdown-item" href="/software">Software</a></li>
+            <li>
+              <div class="dropdown-item">
+                <div class="form-check form-switch d-flex align-items-center justify-content-between">
+                  <label class="form-check-label" for="darkModeToggle">Dark Mode</label>
+                  <input class="form-check-input ms-2" type="checkbox" id="darkModeToggle">
+                </div>
+              </div>
+            </li>
+            <li><a class="dropdown-item" href="/logout">Log out</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container mt-4 dashboard-shell">
+    <div class="section-head mb-3">
+      <h4 class="section-title">Rewards Shop</h4>
+      <p class="section-subtitle mb-0">Redeem points for rewards and track your requests.</p>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <div class="row g-3 mb-4">
+      <div class="col-md-4">
+        <div class="info-card text-center stat-card kpi-card kpi-primary">
+          <div class="stat-label">Earned Points</div>
+          <div class="stat-value text-primary">{{ earned_points }}</div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="info-card text-center stat-card kpi-card kpi-neutral">
+          <div class="stat-label">Spent Points</div>
+          <div class="stat-value">{{ spent_points }}</div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="info-card text-center stat-card kpi-card kpi-success">
+          <div class="stat-label">Available Points</div>
+          <div class="stat-value text-success">{{ available_points }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+      <div class="col-lg-7">
+        <div class="info-card panel-card">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="mb-0">Available Rewards</h5>
+            <span class="small text-muted">Redeem with your points</span>
+          </div>
+          <div class="row g-3">
+            {% for reward in rewards %}
+              <div class="col-md-6">
+                <div class="info-card h-100">
+                  {% set out_of_stock = reward.is_physical and (reward.stock is none or reward.stock <= 0) %}
+                  <div class="d-flex justify-content-between align-items-center mb-2">
+                    <strong>{{ reward.name }}</strong>
+                    <span class="badge text-bg-primary">{{ reward.points_cost }} pts</span>
+                  </div>
+                  <p class="text-muted small mb-2">{{ reward.description or 'Reward item' }}</p>
+                  <div class="small text-muted mb-2">
+                    {% if reward.is_physical %}
+                      Stock: {{ reward.stock if reward.stock is not none else 0 }}
+                    {% else %}
+                      Non-physical reward
+                    {% endif %}
+                  </div>
+                  <form method="POST" action="/shop/redeem">
+                    <input type="hidden" name="reward_id" value="{{ reward.id }}">
+                    <button class="btn btn-sm btn-primary" type="submit" {% if out_of_stock %}disabled{% endif %}>
+                      {% if out_of_stock %}Out of Stock{% else %}Redeem{% endif %}
+                    </button>
+                  </form>
+                </div>
+              </div>
+            {% else %}
+              <div class="col-12">
+                <p class="text-muted mb-0">No rewards available right now.</p>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-5">
+        <div class="info-card panel-card h-100">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="mb-0">Redemption History</h5>
+            <span class="small text-muted">Latest 10</span>
+          </div>
+          <div class="table-responsive">
+            <table class="table align-middle table-compact">
+              <thead>
+                <tr>
+                  <th>Reward</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in redemptions %}
+                  <tr>
+                    <td>
+                      <div>{{ row.reward_name }}</div>
+                      <div class="small text-muted">{{ row.points_cost }} pts</div>
+                      {% if row.is_physical and row.status == 'ready' %}
+                        <div class="small text-success">Ready for pickup</div>
+                      {% endif %}
+                    </td>
+                    <td>
+                      <span class="badge text-bg-secondary">{{ row.status|capitalize }}</span>
+                    </td>
+                  </tr>
+                {% else %}
+                  <tr><td colspan="2" class="text-center text-muted">No redemptions yet.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    const storedTheme = localStorage.getItem('theme');
+    if (storedTheme === 'dark') {
+      document.body.classList.add('dark-mode');
+      document.documentElement.classList.add('dark-mode');
+    }
+    const darkToggle = document.getElementById('darkModeToggle');
+    if (darkToggle) {
+      darkToggle.checked = storedTheme === 'dark';
+      darkToggle.addEventListener('change', (event) => {
+        if (event.target.checked) {
+          document.body.classList.add('dark-mode');
+          document.documentElement.classList.add('dark-mode');
+          localStorage.setItem('theme', 'dark');
+        } else {
+          document.body.classList.remove('dark-mode');
+          document.documentElement.classList.remove('dark-mode');
+          localStorage.setItem('theme', 'light');
+        }
+      });
+    }
+  </script>
+</body>
+</html>

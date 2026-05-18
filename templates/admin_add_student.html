@@ -35,6 +35,15 @@
             <label class="form-label">Year Level *</label>
             <input type="text" class="form-control" name="course_level" required>
           </div>
+          <div class="col-md-4">
+            <label class="form-label">Assigned Lab</label>
+            <select class="form-select" name="lab_assigned">
+              <option value="">Unassigned</option>
+              {% for lab in labs %}
+                <option value="{{ lab.code }}">{{ lab.label }}</option>
+              {% endfor %}
+            </select>
+          </div>
           <div class="col-md-6">
             <label class="form-label">Email</label>
             <input type="email" class="form-control" name="email">

@@ -11,9 +11,10 @@ from urllib.parse import urlencode
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
 app.config['UPLOAD_FOLDER'] = os.path.join('static', 'uploads')
-app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024
+app.config['SOFTWARE_UPLOAD_FOLDER'] = os.path.join('static', 'uploads', 'software')
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+ALLOWED_SOFTWARE_EXTENSIONS = {'exe', 'msi', 'zip', 'rar', '7z', 'pdf', 'doc', 'docx'}
 
 TOTAL_SESSION_LIMIT = 30
 
@@ -87,6 +88,10 @@ ANNOUNCEMENTS = [
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+def allowed_software_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_SOFTWARE_EXTENSIONS
 
 
 def get_db():
@@ -239,6 +244,149 @@ def ensure_reservations_table(db):
         pass
 
     cursor.close()
+
+
+def ensure_software_table(db):
+    cursor = db.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS software_assets (
+            id INT NOT NULL AUTO_INCREMENT,
+            title VARCHAR(150) NOT NULL,
+            description TEXT DEFAULT NULL,
+            lab_code VARCHAR(20) DEFAULT NULL,
+            file_name VARCHAR(255) NOT NULL,
+            original_name VARCHAR(255) NOT NULL,
+            file_size INT NOT NULL,
+            uploaded_by VARCHAR(50) DEFAULT NULL,
+            status ENUM('active', 'inactive') NOT NULL DEFAULT 'active',
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            INDEX idx_software_status (status),
+            INDEX idx_software_lab (lab_code)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+    """)
+
+    alter_statements = [
+        "ALTER TABLE software_assets ADD COLUMN description TEXT DEFAULT NULL",
+        "ALTER TABLE software_assets ADD COLUMN lab_code VARCHAR(20) DEFAULT NULL",
+        "ALTER TABLE software_assets ADD COLUMN original_name VARCHAR(255) NOT NULL",
+        "ALTER TABLE software_assets ADD COLUMN file_size INT NOT NULL",
+        "ALTER TABLE software_assets ADD COLUMN uploaded_by VARCHAR(50) DEFAULT NULL",
+        "ALTER TABLE software_assets ADD COLUMN status ENUM('active', 'inactive') NOT NULL DEFAULT 'active'",
+    ]
+    for stmt in alter_statements:
+        try:
+            cursor.execute(stmt)
+        except mysql.connector.Error:
+            pass
+
+    cursor.close()
+
+
+def ensure_users_table(db):
+    cursor = db.cursor()
+    try:
+        cursor.execute("ALTER TABLE users ADD COLUMN lab_assigned VARCHAR(20) DEFAULT NULL")
+    except mysql.connector.Error:
+        pass
+    cursor.close()
+
+
+def ensure_rewards_table(db):
+    cursor = db.cursor(dictionary=True)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS rewards (
+            id INT NOT NULL AUTO_INCREMENT,
+            name VARCHAR(100) NOT NULL,
+            description TEXT DEFAULT NULL,
+            points_cost INT NOT NULL,
+            is_physical TINYINT(1) NOT NULL DEFAULT 0,
+            stock INT DEFAULT NULL,
+            status ENUM('active', 'inactive') NOT NULL DEFAULT 'active',
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            INDEX idx_rewards_status (status)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+    """)
+
+    alter_statements = [
+        "ALTER TABLE rewards ADD COLUMN description TEXT DEFAULT NULL",
+        "ALTER TABLE rewards ADD COLUMN is_physical TINYINT(1) NOT NULL DEFAULT 0",
+        "ALTER TABLE rewards ADD COLUMN stock INT DEFAULT NULL",
+        "ALTER TABLE rewards ADD COLUMN status ENUM('active', 'inactive') NOT NULL DEFAULT 'active'",
+    ]
+    for stmt in alter_statements:
+        try:
+            cursor.execute(stmt)
+        except mysql.connector.Error:
+            pass
+
+    cursor.execute("SELECT COUNT(*) AS total FROM rewards")
+    total = (cursor.fetchone() or {}).get('total', 0)
+    if not total:
+        seed_rewards = [
+            ('CCS Sticker Pack', 'Official CCS sticker set.', 20, 1, 50, 'active'),
+            ('Lanyard / ID Holder', 'CCS lanyard with ID holder.', 40, 1, 20, 'active'),
+            ('Notebook / Pen Set', 'Branded notebook and pen.', 60, 1, 15, 'active'),
+            ('Extra 30 Minutes Lab Time', 'Extend a lab session by 30 minutes.', 15, 0, None, 'active'),
+            ('Leaderboard Highlight Badge (1 Week)', 'Show a highlight badge for one week.', 50, 0, None, 'active'),
+            ('CCS T-Shirt', 'Limited edition CCS shirt.', 200, 1, 5, 'active'),
+        ]
+        cursor.executemany("""
+            INSERT INTO rewards (name, description, points_cost, is_physical, stock, status)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """, seed_rewards)
+        db.commit()
+
+    cursor.close()
+
+
+def ensure_reward_redemptions_table(db):
+    cursor = db.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS reward_redemptions (
+            id INT NOT NULL AUTO_INCREMENT,
+            reward_id INT NOT NULL,
+            reward_name VARCHAR(100) NOT NULL,
+            student_id_number VARCHAR(20) NOT NULL,
+            points_cost INT NOT NULL,
+            is_physical TINYINT(1) NOT NULL DEFAULT 0,
+            status ENUM('pending', 'approved', 'ready', 'claimed', 'denied', 'cancelled')
+                NOT NULL DEFAULT 'pending',
+            admin_note VARCHAR(255) DEFAULT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT NULL,
+            ready_at DATETIME DEFAULT NULL,
+            claimed_at DATETIME DEFAULT NULL,
+            PRIMARY KEY (id),
+            INDEX idx_redemptions_student (student_id_number),
+            INDEX idx_redemptions_status (status),
+            CONSTRAINT fk_redemptions_reward
+                FOREIGN KEY (reward_id) REFERENCES rewards(id)
+                ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+    """)
+    cursor.close()
+
+
+def get_points_summary(cursor, student_id_number):
+    cursor.execute("""
+        SELECT COALESCE(SUM(points_awarded), 0) AS earned_points
+        FROM user_feedback
+        WHERE student_id_number=%s
+    """, (student_id_number,))
+    earned_points = (cursor.fetchone() or {}).get('earned_points', 0)
+
+    cursor.execute("""
+        SELECT COALESCE(SUM(points_cost), 0) AS spent_points
+        FROM reward_redemptions
+        WHERE student_id_number=%s
+          AND status IN ('pending', 'approved', 'ready', 'claimed')
+    """, (student_id_number,))
+    spent_points = (cursor.fetchone() or {}).get('spent_points', 0)
+
+    available_points = max(int(earned_points) - int(spent_points), 0)
+    return int(earned_points), int(spent_points), available_points
 
 
 def get_taken_seats(cursor, lab_code, reservation_date, reservation_slot):
@@ -691,6 +839,134 @@ def admin_dashboard():
                            leaderboard_preview=leaderboard_preview)
 
 
+@app.route('/admin/analytics')
+def admin_analytics():
+    if not is_admin_user():
+        flash('Please log in as admin.', 'danger')
+        return redirect('/')
+
+    db = get_db()
+    ensure_sit_in_logs_table(db)
+    ensure_reservations_table(db)
+    ensure_user_feedback_table(db)
+    cursor = db.cursor(dictionary=True)
+
+    cursor.execute("""
+        SELECT AVG(TIMESTAMPDIFF(MINUTE, started_at, ended_at)) AS avg_minutes
+        FROM sit_in_logs
+        WHERE status='completed' AND ended_at IS NOT NULL
+    """)
+    avg_minutes = float((cursor.fetchone() or {}).get('avg_minutes') or 0)
+
+    cursor.execute("""
+        SELECT lab, COUNT(*) AS total
+        FROM sit_in_logs
+        WHERE lab IS NOT NULL
+        GROUP BY lab
+        ORDER BY total DESC
+        LIMIT 1
+    """)
+    busiest_lab_row = cursor.fetchone() or {}
+
+    cursor.execute("""
+        SELECT COUNT(*) AS total
+        FROM sit_in_logs
+        WHERE started_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+    """)
+    sitins_last_30 = int((cursor.fetchone() or {}).get('total') or 0)
+
+    cursor.execute("""
+        SELECT
+            SUM(CASE WHEN status='approved' THEN 1 ELSE 0 END) AS approved,
+            SUM(CASE WHEN status='denied' THEN 1 ELSE 0 END) AS denied
+        FROM reservations
+    """)
+    reservation_row = cursor.fetchone() or {}
+    approved_count = int(reservation_row.get('approved') or 0)
+    denied_count = int(reservation_row.get('denied') or 0)
+    reservation_total = approved_count + denied_count
+    approval_rate = round((approved_count / reservation_total) * 100, 1) if reservation_total else 0
+
+    cursor.execute("""
+        SELECT AVG(rating) AS avg_rating
+        FROM user_feedback
+        WHERE rating IS NOT NULL
+    """)
+    avg_rating = float((cursor.fetchone() or {}).get('avg_rating') or 0)
+
+    cursor.execute("""
+        SELECT lab, COUNT(*) AS total
+        FROM sit_in_logs
+        WHERE lab IS NOT NULL
+        GROUP BY lab
+        ORDER BY total DESC
+    """)
+    sitins_by_lab = cursor.fetchall()
+
+    cursor.execute("""
+        SELECT status, COUNT(*) AS total
+        FROM reservations
+        GROUP BY status
+    """)
+    reservations_by_status = cursor.fetchall()
+
+    cursor.execute("""
+        SELECT rating, COUNT(*) AS total
+        FROM user_feedback
+        WHERE rating IS NOT NULL
+        GROUP BY rating
+        ORDER BY rating
+    """)
+    ratings_distribution = cursor.fetchall()
+
+    cursor.close()
+    db.close()
+
+    lab_labels = []
+    lab_values = []
+    for row in sitins_by_lab:
+        lab_info = LAB_LOOKUP.get(row.get('lab'))
+        lab_labels.append(lab_info['label'] if lab_info else (row.get('lab') or 'Unassigned'))
+        lab_values.append(int(row.get('total') or 0))
+
+    status_order = ['pending', 'approved', 'checked_in', 'denied', 'cancelled', 'no_show']
+    status_counts = {status: 0 for status in status_order}
+    for row in reservations_by_status:
+        status_counts[row['status']] = int(row.get('total') or 0)
+    reservation_labels = [status.replace('_', ' ').title() for status in status_order]
+    reservation_values = [status_counts[status] for status in status_order]
+
+    rating_labels = [str(value) for value in range(1, 6)]
+    rating_counts = {str(value): 0 for value in range(1, 6)}
+    for row in ratings_distribution:
+        rating_key = str(int(row['rating']))
+        rating_counts[rating_key] = int(row.get('total') or 0)
+    rating_values = [rating_counts[label] for label in rating_labels]
+
+    busiest_lab_code = busiest_lab_row.get('lab')
+    busiest_lab_info = LAB_LOOKUP.get(busiest_lab_code)
+    busiest_lab_label = busiest_lab_info['label'] if busiest_lab_info else (busiest_lab_code or 'Unassigned')
+
+    metrics = {
+        'avg_minutes': round(avg_minutes, 1),
+        'busiest_lab': busiest_lab_label,
+        'sitins_last_30': sitins_last_30,
+        'approval_rate': approval_rate,
+        'avg_rating': round(avg_rating, 2),
+    }
+
+    return render_template('admin_analytics.html',
+                           metrics=metrics,
+                           lab_labels=lab_labels,
+                           lab_values=lab_values,
+                           reservation_labels=reservation_labels,
+                           reservation_values=reservation_values,
+                           rating_labels=rating_labels,
+                           rating_values=rating_values,
+                           approved_count=approved_count,
+                           denied_count=denied_count)
+
+
 @app.route('/admin/leaderboard')
 def admin_leaderboard():
     if not is_admin_user():
@@ -979,6 +1255,7 @@ def admin_add_student():
         course_level = request.form['course_level'].strip()
         email = request.form.get('email', '').strip()
         address = request.form.get('address', '').strip()
+        lab_assigned = (request.form.get('lab_assigned') or '').strip()
         password = request.form['password']
         confirm_password = request.form['confirm_password']
 
@@ -992,16 +1269,20 @@ def admin_add_student():
 
         hashed_pw = generate_password_hash(password)
 
+        if lab_assigned and lab_assigned not in LAB_LOOKUP:
+            lab_assigned = ''
+
         db = get_db()
+        ensure_users_table(db)
         cursor = db.cursor()
         try:
             cursor.execute(
                 """INSERT INTO users
                        (id_number, last_name, first_name, middle_name, course,
-                        course_level, email, address, password)
-                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                        course_level, email, address, password, lab_assigned)
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
                 (id_number, last_name, first_name, middle_name, course,
-                 course_level, email, address, hashed_pw)
+                 course_level, email, address, hashed_pw, lab_assigned or None)
             )
             db.commit()
             flash('Student added successfully.', 'success')
@@ -1012,7 +1293,7 @@ def admin_add_student():
             cursor.close()
             db.close()
 
-    return render_template('admin_add_student.html')
+    return render_template('admin_add_student.html', labs=LABS)
 
 
 @app.route('/admin/students/reset_sessions', methods=['POST'])
@@ -1058,6 +1339,7 @@ def admin_sit_in():
             db = get_db()
             ensure_sit_in_logs_table(db)
             ensure_reservations_table(db)
+            ensure_users_table(db)
             cursor = db.cursor(dictionary=True)
 
             student, remaining_sessions, active_session, completed_sessions = lookup_student_session(cursor, searched_id)
@@ -1088,6 +1370,12 @@ def admin_sit_in():
                             INSERT INTO sit_in_logs (student_id_number, purpose, lab, session_no, status)
                             VALUES (%s, %s, %s, %s, 'active')
                         """, (searched_id, purpose_value, lab_code, completed_sessions + 1))
+                        cursor.execute("""
+                            UPDATE users
+                            SET lab_assigned=%s
+                            WHERE id_number=%s
+                              AND id_number NOT LIKE 'adm-%'
+                        """, (lab_code, searched_id))
                         db.commit()
                         cursor.close()
                         db.close()
@@ -1238,6 +1526,7 @@ def admin_edit_student(id_number):
         return redirect('/')
 
     db = get_db()
+    ensure_users_table(db)
     cursor = db.cursor(dictionary=True)
 
     if request.method == 'POST':
@@ -1248,6 +1537,10 @@ def admin_edit_student(id_number):
         course_level = request.form.get('course_level', '').strip()
         email = request.form.get('email', '').strip()
         address = request.form.get('address', '').strip()
+        lab_assigned = (request.form.get('lab_assigned') or '').strip()
+
+        if lab_assigned and lab_assigned not in LAB_LOOKUP:
+            lab_assigned = ''
 
         if not last_name or not first_name or not course or not course_level:
             cursor.close()
@@ -1263,10 +1556,11 @@ def admin_edit_student(id_number):
                 course=%s,
                 course_level=%s,
                 email=%s,
-                address=%s
+                address=%s,
+                lab_assigned=%s
             WHERE id_number=%s
               AND id_number NOT LIKE 'adm-%'
-        """, (last_name, first_name, middle_name, course, course_level, email, address, id_number))
+        """, (last_name, first_name, middle_name, course, course_level, email, address, lab_assigned or None, id_number))
         db.commit()
 
         if cursor.rowcount == 0:
@@ -1281,7 +1575,7 @@ def admin_edit_student(id_number):
         return redirect('/admin/students')
 
     cursor.execute("""
-        SELECT id_number, last_name, first_name, middle_name, course, course_level, email, address
+        SELECT id_number, last_name, first_name, middle_name, course, course_level, email, address, lab_assigned
         FROM users
         WHERE id_number = %s
           AND id_number NOT LIKE 'adm-%'
@@ -1295,7 +1589,7 @@ def admin_edit_student(id_number):
         flash('Student not found.', 'danger')
         return redirect('/admin/students')
 
-    return render_template('admin_edit_student.html', student=student)
+    return render_template('admin_edit_student.html', student=student, labs=LABS)
 
 
 @app.route('/admin/students/<id_number>/delete', methods=['POST'])
@@ -1898,6 +2192,7 @@ def admin_reservation_decision(reservation_id):
     db = get_db()
     ensure_sit_in_logs_table(db)
     ensure_reservations_table(db)
+    ensure_users_table(db)
     cursor = db.cursor(dictionary=True)
 
     cursor.execute("""
@@ -1935,6 +2230,17 @@ def admin_reservation_decision(reservation_id):
             return redirect('/admin/reservations')
 
         cursor.execute("""
+            SELECT COUNT(*) AS active_count
+            FROM sit_in_logs
+            WHERE student_id_number=%s AND status='active'
+        """, (row['student_id_number'],))
+        if (cursor.fetchone() or {}).get('active_count', 0) > 0:
+            cursor.close()
+            db.close()
+            flash('Student already has an active sit-in session.', 'warning')
+            return redirect('/admin/reservations')
+
+        cursor.execute("""
             SELECT id
             FROM reservations
             WHERE id <> %s
@@ -1950,6 +2256,13 @@ def admin_reservation_decision(reservation_id):
             db.close()
             flash('Seat already taken for that reservation schedule.', 'warning')
             return redirect('/admin/reservations')
+
+            cursor.execute("""
+                        UPDATE users
+                        SET lab_assigned=%s
+                        WHERE id_number=%s
+                            AND id_number NOT LIKE 'adm-%'
+                """, (row['lab_code'], row['student_id_number']))
 
     if decision == 'checked_in':
         usage = get_session_usage(cursor, row['student_id_number'])
@@ -2029,6 +2342,7 @@ def login_user():
     password = request.form['password']
 
     db = get_db()
+    ensure_users_table(db)
     cursor = db.cursor(dictionary=True)
     cursor.execute("SELECT * FROM users WHERE id_number = %s", (id_number,))
     user = cursor.fetchone()
@@ -2043,6 +2357,7 @@ def login_user():
             'middle_name': user['middle_name'] or '',
             'course': user['course'],
             'course_level': user['course_level'],
+            'lab_assigned': user.get('lab_assigned') or '',
             'email': user['email'] or '',
             'address': user['address'] or '',
             'photo_path': user.get('photo_path') or '',
@@ -2322,6 +2637,506 @@ def student_announcements():
     return render_template('announcements.html',
                            user=user,
                            announcements=announcements)
+
+
+@app.route('/shop')
+def student_shop():
+    if 'user' not in session:
+        return redirect('/')
+
+    user = session['user']
+    if is_admin_user():
+        return redirect('/admin/rewards')
+
+    db = get_db()
+    ensure_rewards_table(db)
+    ensure_reward_redemptions_table(db)
+    ensure_user_feedback_table(db)
+    cursor = db.cursor(dictionary=True)
+
+    cursor.execute("""
+        SELECT id, name, description, points_cost, is_physical, stock, status
+        FROM rewards
+        WHERE status='active'
+        ORDER BY points_cost ASC, name ASC
+    """)
+    rewards = cursor.fetchall()
+
+    earned_points, spent_points, available_points = get_points_summary(cursor, user['id_number'])
+
+    cursor.execute("""
+        SELECT id, reward_name, points_cost, status, is_physical, created_at, ready_at, claimed_at, admin_note
+        FROM reward_redemptions
+        WHERE student_id_number=%s
+        ORDER BY created_at DESC
+        LIMIT 10
+    """, (user['id_number'],))
+    redemptions = cursor.fetchall()
+
+    cursor.close()
+    db.close()
+
+    return render_template('shop.html',
+                           user=user,
+                           rewards=rewards,
+                           earned_points=earned_points,
+                           spent_points=spent_points,
+                           available_points=available_points,
+                           redemptions=redemptions)
+
+
+@app.route('/admin/software', methods=['GET', 'POST'])
+def admin_software():
+    if not is_admin_user():
+        flash('Please log in as admin.', 'danger')
+        return redirect('/')
+
+    db = get_db()
+    ensure_software_table(db)
+    cursor = db.cursor(dictionary=True)
+
+    if request.method == 'POST':
+        title = (request.form.get('title') or '').strip()
+        description = (request.form.get('description') or '').strip()
+        lab_code = (request.form.get('lab_code') or '').strip()
+        file_obj = request.files.get('file')
+
+        if lab_code and lab_code not in LAB_LOOKUP:
+            lab_code = ''
+
+        if not title:
+            flash('Title is required.', 'warning')
+            return redirect('/admin/software')
+
+        if not file_obj or not file_obj.filename:
+            flash('Please choose a file to upload.', 'warning')
+            return redirect('/admin/software')
+
+        if not allowed_software_file(file_obj.filename):
+            flash('Unsupported file type.', 'danger')
+            return redirect('/admin/software')
+
+        original_name = secure_filename(file_obj.filename)
+        if not original_name:
+            flash('Invalid file name.', 'danger')
+            return redirect('/admin/software')
+
+        base_name = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{original_name}"
+        upload_dir = app.config['SOFTWARE_UPLOAD_FOLDER']
+        os.makedirs(upload_dir, exist_ok=True)
+        stored_name = base_name
+        counter = 1
+        while os.path.exists(os.path.join(upload_dir, stored_name)):
+            stored_name = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{counter}_{original_name}"
+            counter += 1
+
+        file_path = os.path.join(upload_dir, stored_name)
+        file_obj.save(file_path)
+        file_size = os.path.getsize(file_path)
+        uploaded_by = (session.get('user') or {}).get('id_number')
+
+        cursor.execute("""
+            INSERT INTO software_assets (
+                title, description, lab_code, file_name, original_name,
+                file_size, uploaded_by, status
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, 'active')
+        """, (
+            title,
+            description or None,
+            lab_code or None,
+            stored_name,
+            original_name,
+            file_size,
+            uploaded_by,
+        ))
+        db.commit()
+        flash('Software uploaded successfully.', 'success')
+        return redirect('/admin/software')
+
+    cursor.execute("""
+        SELECT id, title, description, lab_code, original_name, file_size, uploaded_by, created_at
+        FROM software_assets
+        WHERE status='active'
+        ORDER BY created_at DESC
+    """)
+    rows = cursor.fetchall()
+    cursor.close()
+    db.close()
+
+    for row in rows:
+        lab_info = LAB_LOOKUP.get(row.get('lab_code'))
+        row['lab_label'] = lab_info['label'] if lab_info else (row.get('lab_code') or 'All Labs')
+
+    return render_template('admin_software.html', rows=rows, labs=LABS)
+
+
+@app.route('/software')
+def student_software():
+    if 'user' not in session:
+        return redirect('/')
+
+    user = session['user']
+    if is_admin_user():
+        return redirect('/admin/software')
+
+    db = get_db()
+    ensure_users_table(db)
+    ensure_software_table(db)
+    cursor = db.cursor(dictionary=True)
+
+    cursor.execute("""
+        SELECT lab_assigned
+        FROM users
+        WHERE id_number=%s
+        LIMIT 1
+    """, (user['id_number'],))
+    assigned_row = cursor.fetchone() or {}
+    assigned_lab = (assigned_row.get('lab_assigned') or '').strip()
+    if assigned_lab and assigned_lab not in LAB_LOOKUP:
+        assigned_lab = ''
+
+    rows = []
+    if assigned_lab:
+        cursor.execute("""
+            SELECT id, title, description, lab_code, original_name, file_size, created_at
+            FROM software_assets
+            WHERE status='active'
+              AND (lab_code=%s OR lab_code IS NULL OR lab_code='')
+            ORDER BY created_at DESC
+        """, (assigned_lab,))
+        rows = cursor.fetchall()
+
+    cursor.close()
+    db.close()
+
+    for row in rows:
+        lab_info = LAB_LOOKUP.get(row.get('lab_code'))
+        row['lab_label'] = lab_info['label'] if lab_info else (row.get('lab_code') or 'All Labs')
+
+    lab_info = LAB_LOOKUP.get(assigned_lab)
+    assigned_label = lab_info['label'] if lab_info else ''
+
+    return render_template('software.html',
+                           rows=rows,
+                           labs=LABS,
+                           assigned_lab=assigned_lab,
+                           assigned_label=assigned_label)
+
+
+@app.route('/software/download/<int:asset_id>')
+def download_software(asset_id):
+    if 'user' not in session:
+        return redirect('/')
+
+    user = session['user']
+    db = get_db()
+    ensure_users_table(db)
+    ensure_software_table(db)
+    cursor = db.cursor(dictionary=True)
+
+    cursor.execute("""
+        SELECT id, title, lab_code, file_name, original_name
+        FROM software_assets
+        WHERE id=%s AND status='active'
+        LIMIT 1
+    """, (asset_id,))
+    row = cursor.fetchone()
+    if not row:
+        cursor.close()
+        db.close()
+        flash('File not found.', 'warning')
+        return redirect('/software')
+
+    if not is_admin_user():
+        cursor.execute("""
+            SELECT lab_assigned
+            FROM users
+            WHERE id_number=%s
+            LIMIT 1
+        """, (user['id_number'],))
+        assigned_row = cursor.fetchone() or {}
+        assigned_lab = (assigned_row.get('lab_assigned') or '').strip()
+        if assigned_lab and assigned_lab not in LAB_LOOKUP:
+            assigned_lab = ''
+        if not assigned_lab or (row.get('lab_code') not in (None, '', assigned_lab)):
+            cursor.close()
+            db.close()
+            flash('You are not allowed to access this file.', 'danger')
+            return redirect('/software')
+
+    cursor.close()
+    db.close()
+
+    upload_dir = app.config['SOFTWARE_UPLOAD_FOLDER']
+    file_path = os.path.join(upload_dir, row['file_name'])
+    if not os.path.exists(file_path):
+        flash('File is missing on the server.', 'warning')
+        return redirect('/software')
+
+    return send_file(file_path, as_attachment=True, download_name=row['original_name'])
+
+
+@app.route('/shop/redeem', methods=['POST'])
+def redeem_reward():
+    if 'user' not in session:
+        return redirect('/')
+
+    user = session['user']
+    reward_id = request.form.get('reward_id')
+
+    try:
+        reward_id = int(reward_id)
+    except (TypeError, ValueError):
+        flash('Invalid reward selection.', 'warning')
+        return redirect('/shop')
+
+    db = get_db()
+    ensure_rewards_table(db)
+    ensure_reward_redemptions_table(db)
+    ensure_user_feedback_table(db)
+    cursor = db.cursor(dictionary=True)
+
+    cursor.execute("""
+        SELECT id, name, description, points_cost, is_physical, stock, status
+        FROM rewards
+        WHERE id=%s
+        LIMIT 1
+    """, (reward_id,))
+    reward = cursor.fetchone()
+
+    if not reward or reward['status'] != 'active':
+        cursor.close()
+        db.close()
+        flash('Reward is not available.', 'warning')
+        return redirect('/shop')
+
+    earned_points, spent_points, available_points = get_points_summary(cursor, user['id_number'])
+    if available_points < int(reward['points_cost']):
+        cursor.close()
+        db.close()
+        flash('Not enough points to redeem this reward.', 'warning')
+        return redirect('/shop')
+
+    if reward['is_physical'] and (reward['stock'] is None or int(reward['stock']) <= 0):
+        cursor.close()
+        db.close()
+        flash('This item is out of stock.', 'warning')
+        return redirect('/shop')
+
+    if reward['is_physical']:
+        cursor.execute("""
+            UPDATE rewards
+            SET stock = stock - 1
+            WHERE id=%s AND stock > 0
+        """, (reward_id,))
+
+    status = 'pending' if reward['is_physical'] else 'approved'
+    cursor.execute("""
+        INSERT INTO reward_redemptions (
+            reward_id, reward_name, student_id_number, points_cost, is_physical, status
+        ) VALUES (%s, %s, %s, %s, %s, %s)
+    """, (reward_id, reward['name'], user['id_number'], reward['points_cost'], int(reward['is_physical']), status))
+
+    db.commit()
+    cursor.close()
+    db.close()
+
+    if reward['is_physical']:
+        flash('Redemption submitted. We will notify you when it is ready for pickup.', 'success')
+    else:
+        flash('Reward redeemed successfully.', 'success')
+    return redirect('/shop')
+
+
+@app.route('/admin/rewards')
+def admin_rewards():
+    if not is_admin_user():
+        flash('Please log in as admin.', 'danger')
+        return redirect('/')
+
+    db = get_db()
+    ensure_rewards_table(db)
+    ensure_reward_redemptions_table(db)
+    cursor = db.cursor(dictionary=True)
+
+    cursor.execute("""
+        SELECT id, name, description, points_cost, is_physical, stock, status
+        FROM rewards
+        ORDER BY points_cost ASC, name ASC
+    """)
+    rewards = cursor.fetchall()
+
+    cursor.execute("""
+        SELECT r.id, r.reward_name, r.points_cost, r.is_physical, r.status, r.created_at,
+               r.ready_at, r.claimed_at, r.admin_note,
+               u.id_number, u.first_name, u.last_name, u.middle_name
+        FROM reward_redemptions r
+        LEFT JOIN users u ON u.id_number = r.student_id_number
+        ORDER BY r.created_at DESC
+        LIMIT 50
+    """)
+    redemptions = cursor.fetchall()
+    cursor.close()
+    db.close()
+
+    for row in redemptions:
+        full_name = f"{row.get('last_name') or ''}, {row.get('first_name') or ''}"
+        if row.get('middle_name'):
+            full_name = f"{full_name} {row['middle_name']}"
+        row['student_name'] = full_name.strip(', ')
+
+    return render_template('admin_rewards.html', rewards=rewards, redemptions=redemptions)
+
+
+@app.route('/admin/rewards/create', methods=['POST'])
+def admin_create_reward():
+    if not is_admin_user():
+        flash('Please log in as admin.', 'danger')
+        return redirect('/')
+
+    name = (request.form.get('name') or '').strip()
+    description = (request.form.get('description') or '').strip()
+    points_cost = (request.form.get('points_cost') or '').strip()
+    is_physical = 1 if request.form.get('is_physical') == '1' else 0
+    stock_raw = (request.form.get('stock') or '').strip()
+    status = (request.form.get('status') or 'active').strip()
+
+    if not name or not points_cost.isdigit():
+        flash('Reward name and points cost are required.', 'warning')
+        return redirect('/admin/rewards')
+
+    stock = None
+    if is_physical:
+        try:
+            stock = int(stock_raw)
+        except ValueError:
+            stock = 0
+
+    db = get_db()
+    ensure_rewards_table(db)
+    cursor = db.cursor()
+    cursor.execute("""
+        INSERT INTO rewards (name, description, points_cost, is_physical, stock, status)
+        VALUES (%s, %s, %s, %s, %s, %s)
+    """, (name, description or None, int(points_cost), is_physical, stock, status))
+    db.commit()
+    cursor.close()
+    db.close()
+
+    flash('Reward added successfully.', 'success')
+    return redirect('/admin/rewards')
+
+
+@app.route('/admin/rewards/<int:reward_id>/update', methods=['POST'])
+def admin_update_reward(reward_id):
+    if not is_admin_user():
+        flash('Please log in as admin.', 'danger')
+        return redirect('/')
+
+    name = (request.form.get('name') or '').strip()
+    description = (request.form.get('description') or '').strip()
+    points_cost = (request.form.get('points_cost') or '').strip()
+    is_physical = 1 if request.form.get('is_physical') == '1' else 0
+    stock_raw = (request.form.get('stock') or '').strip()
+    status = (request.form.get('status') or 'active').strip()
+
+    if not name or not points_cost.isdigit():
+        flash('Reward name and points cost are required.', 'warning')
+        return redirect('/admin/rewards')
+
+    stock = None
+    if is_physical:
+        try:
+            stock = int(stock_raw)
+        except ValueError:
+            stock = 0
+
+    db = get_db()
+    ensure_rewards_table(db)
+    cursor = db.cursor()
+    cursor.execute("""
+        UPDATE rewards
+        SET name=%s,
+            description=%s,
+            points_cost=%s,
+            is_physical=%s,
+            stock=%s,
+            status=%s
+        WHERE id=%s
+    """, (name, description or None, int(points_cost), is_physical, stock, status, reward_id))
+    db.commit()
+    cursor.close()
+    db.close()
+
+    flash('Reward updated successfully.', 'success')
+    return redirect('/admin/rewards')
+
+
+@app.route('/admin/redemptions/<int:redemption_id>/status', methods=['POST'])
+def admin_update_redemption_status(redemption_id):
+    if not is_admin_user():
+        flash('Please log in as admin.', 'danger')
+        return redirect('/')
+
+    status = (request.form.get('status') or '').strip()
+    admin_note = (request.form.get('admin_note') or '').strip()
+
+    if status not in ('approved', 'ready', 'claimed', 'denied'):
+        flash('Invalid redemption status.', 'warning')
+        return redirect('/admin/rewards')
+
+    db = get_db()
+    ensure_rewards_table(db)
+    ensure_reward_redemptions_table(db)
+    cursor = db.cursor(dictionary=True)
+
+    cursor.execute("""
+        SELECT id, reward_id, reward_name, is_physical, status
+        FROM reward_redemptions
+        WHERE id=%s
+        LIMIT 1
+    """, (redemption_id,))
+    redemption = cursor.fetchone()
+
+    if not redemption:
+        cursor.close()
+        db.close()
+        flash('Redemption not found.', 'warning')
+        return redirect('/admin/rewards')
+
+    if status == 'denied' and redemption['is_physical']:
+        cursor.execute("""
+            UPDATE rewards
+            SET stock = stock + 1
+            WHERE id=%s
+        """, (redemption['reward_id'],))
+
+    ready_at = datetime.now() if status == 'ready' else None
+    claimed_at = datetime.now() if status == 'claimed' else None
+
+    cursor.execute("""
+        UPDATE reward_redemptions
+        SET status=%s,
+            admin_note=%s,
+            updated_at=NOW(),
+            ready_at=%s,
+            claimed_at=%s
+        WHERE id=%s
+    """, (status, admin_note or None, ready_at, claimed_at, redemption_id))
+    db.commit()
+    cursor.close()
+    db.close()
+
+    if status == 'ready':
+        flash('Reward marked as ready for pickup.', 'success')
+    elif status == 'claimed':
+        flash('Reward marked as claimed.', 'success')
+    elif status == 'denied':
+        flash('Redemption denied.', 'warning')
+    else:
+        flash('Redemption updated.', 'success')
+
+    return redirect('/admin/rewards')
 
 
 @app.route('/notifications/mark-seen', methods=['POST'])

@@ -1,0 +1,175 @@
+{% extends 'admin_base.html' %}
+{% set title = 'Analytics | CCS Sit-in Monitoring' %}
+
+{% block content %}
+<div class="dashboard-shell">
+  <div class="section-head mb-3">
+    <h4 class="section-title">Sit-in Analytics</h4>
+    <p class="section-subtitle mb-0">Lab usage, reservations, and feedback snapshots.</p>
+  </div>
+
+  <div class="row g-3 mb-4">
+    <div class="col-md-3">
+      <div class="info-card text-center stat-card kpi-card kpi-primary">
+        <div class="stat-label">Avg. Session Length (Min)</div>
+        <div class="stat-value">{{ metrics.avg_minutes }}</div>
+        <div class="small text-muted">Completed sessions only</div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="info-card text-center stat-card kpi-card kpi-neutral">
+        <div class="stat-label">Busiest Lab (All Time)</div>
+        <div class="stat-value">{{ metrics.busiest_lab }}</div>
+        <div class="small text-muted">Most recorded sit-ins</div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="info-card text-center stat-card kpi-card kpi-success">
+        <div class="stat-label">Sit-ins (Last 30 Days)</div>
+        <div class="stat-value">{{ metrics.sitins_last_30 }}</div>
+        <div class="small text-muted">Check-ins and walk-ins</div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="info-card text-center stat-card kpi-card kpi-rank">
+        <div class="stat-label">Reservation Approval Rate</div>
+        <div class="stat-value">{{ metrics.approval_rate }}%</div>
+        <div class="small text-muted">Approved vs denied</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-4">
+    <div class="col-lg-8">
+      <div class="info-card">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h5 class="mb-0">Sit-ins by Lab</h5>
+          <span class="small text-muted">Total sessions per laboratory</span>
+        </div>
+        <div class="chart-area">
+          <canvas id="labChart" height="120"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-4">
+      <div class="info-card">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h5 class="mb-0">Feedback Rating</h5>
+          <span class="small text-muted">Average score</span>
+        </div>
+        <div class="text-center">
+          <div class="stat-value">{{ metrics.avg_rating }}</div>
+          <div class="small text-muted">out of 5.0</div>
+        </div>
+        <hr>
+        <canvas id="ratingChart" height="160"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-7">
+      <div class="info-card">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h5 class="mb-0">Reservations Breakdown</h5>
+          <span class="small text-muted">Pending to no-show counts</span>
+        </div>
+        <canvas id="reservationChart" height="140"></canvas>
+      </div>
+    </div>
+    <div class="col-lg-5">
+      <div class="info-card">
+        <h5 class="mb-3">Approval Summary</h5>
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="small text-muted">Approved</span>
+          <span class="fw-semibold text-success">{{ approved_count }}</span>
+        </div>
+        <div class="d-flex justify-content-between align-items-center">
+          <span class="small text-muted">Denied</span>
+          <span class="fw-semibold text-danger">{{ denied_count }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+  const labLabels = {{ lab_labels | tojson }};
+  const labValues = {{ lab_values | tojson }};
+  const reservationLabels = {{ reservation_labels | tojson }};
+  const reservationValues = {{ reservation_values | tojson }};
+  const ratingLabels = {{ rating_labels | tojson }};
+  const ratingValues = {{ rating_values | tojson }};
+
+  const labChart = new Chart(document.getElementById('labChart'), {
+    type: 'bar',
+    data: {
+      labels: labLabels,
+      datasets: [{
+        label: 'Sit-ins',
+        data: labValues,
+        backgroundColor: 'rgba(13, 110, 253, 0.7)',
+        borderRadius: 8
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false }
+      },
+      scales: {
+        y: { beginAtZero: true, ticks: { precision: 0 } }
+      }
+    }
+  });
+
+  const reservationChart = new Chart(document.getElementById('reservationChart'), {
+    type: 'doughnut',
+    data: {
+      labels: reservationLabels,
+      datasets: [{
+        data: reservationValues,
+        backgroundColor: [
+          '#6c757d',
+          '#198754',
+          '#0d6efd',
+          '#dc3545',
+          '#adb5bd',
+          '#ffc107'
+        ]
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: 'bottom' }
+      }
+    }
+  });
+
+  const ratingChart = new Chart(document.getElementById('ratingChart'), {
+    type: 'bar',
+    data: {
+      labels: ratingLabels,
+      datasets: [{
+        label: 'Responses',
+        data: ratingValues,
+        backgroundColor: 'rgba(25, 135, 84, 0.7)',
+        borderRadius: 6
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false }
+      },
+      scales: {
+        y: { beginAtZero: true, ticks: { precision: 0 } }
+      }
+    }
+  });
+</script>
+{% endblock %}

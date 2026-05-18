@@ -1,0 +1,80 @@
+{% extends 'admin_base.html' %}
+{% set title = 'Software Uploads | CCS Sit-in Monitoring' %}
+
+{% block content %}
+<div class="row g-4">
+  <div class="col-lg-5">
+    <div class="info-card h-100">
+      <h5 class="mb-3">Software / App Import & Upload</h5>
+      <form class="row g-2" method="POST" action="/admin/software" enctype="multipart/form-data">
+        <div class="col-12">
+          <label class="form-label mb-1">Laboratory</label>
+          <select class="form-select" name="lab_code">
+            <option value="">All Labs</option>
+            {% for lab in labs %}
+              <option value="{{ lab.code }}">{{ lab.label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-12">
+          <label class="form-label mb-1">Title</label>
+          <input class="form-control" type="text" name="title" placeholder="e.g. VS Code Installer" required>
+        </div>
+        <div class="col-12">
+          <label class="form-label mb-1">Description</label>
+          <input class="form-control" type="text" name="description" placeholder="Optional notes, version, usage">
+        </div>
+        <div class="col-12">
+          <label class="form-label mb-1">File</label>
+          <input class="form-control" type="file" name="file" required>
+          <div class="small text-muted mt-1">Allowed: exe, msi, zip, rar, 7z, pdf, doc, docx. Large files may take longer to upload.</div>
+        </div>
+        <div class="col-12 d-grid">
+          <button class="btn btn-success" type="submit">Upload</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="col-lg-7">
+    <div class="info-card">
+      <h5 class="mb-3">Uploaded Files</h5>
+      <div class="table-responsive">
+        <table class="table align-middle table-compact">
+          <thead>
+            <tr>
+              <th>Title</th>
+              <th>Lab</th>
+              <th>File</th>
+              <th>Size</th>
+              <th>Uploaded By</th>
+              <th>Date</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in rows %}
+              <tr>
+                <td>
+                  <div class="fw-semibold">{{ row.title }}</div>
+                  <div class="small text-muted">{{ row.description or 'Latest version' }}</div>
+                </td>
+                <td>{{ row.lab_label }}</td>
+                <td>{{ row.original_name }}</td>
+                <td>{{ '%.2f'|format((row.file_size or 0) / 1024 / 1024) }} MB</td>
+                <td>{{ row.uploaded_by or '-' }}</td>
+                <td>{{ row.created_at.strftime('%Y-%m-%d %H:%M') if row.created_at }}</td>
+                <td>
+                  <a class="btn btn-sm btn-outline-primary" href="/software/download/{{ row.id }}">Download</a>
+                </td>
+              </tr>
+            {% else %}
+              <tr><td colspan="7" class="text-center text-muted">No uploads yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

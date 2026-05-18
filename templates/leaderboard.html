@@ -30,6 +30,17 @@
           <ul class="dropdown-menu dropdown-menu-end">
             <li><a class="dropdown-item" href="/dashboard">Dashboard</a></li>
             <li><a class="dropdown-item" href="/edit_profile">Edit Profile</a></li>
+            <li><a class="dropdown-item" href="/announcements">Announcements</a></li>
+            <li><a class="dropdown-item" href="/shop">Rewards Shop</a></li>
+            <li><a class="dropdown-item" href="/software">Software</a></li>
+            <li>
+              <div class="dropdown-item">
+                <div class="form-check form-switch d-flex align-items-center justify-content-between">
+                  <label class="form-check-label" for="darkModeToggle">Dark Mode</label>
+                  <input class="form-check-input ms-2" type="checkbox" id="darkModeToggle">
+                </div>
+              </div>
+            </li>
             <li><a class="dropdown-item" href="/logout">Log out</a></li>
           </ul>
         </div>
@@ -132,5 +143,26 @@
       });
     }, 7000);
   </script>
+    const storedTheme = localStorage.getItem('theme');
+    if (storedTheme === 'dark') {
+      document.body.classList.add('dark-mode');
+      document.documentElement.classList.add('dark-mode');
+    }
+    const darkToggle = document.getElementById('darkModeToggle');
+    if (darkToggle) {
+      darkToggle.checked = storedTheme === 'dark';
+      darkToggle.addEventListener('change', (event) => {
+        if (event.target.checked) {
+          document.body.classList.add('dark-mode');
+          document.documentElement.classList.add('dark-mode');
+          localStorage.setItem('theme', 'dark');
+        } else {
+          document.body.classList.remove('dark-mode');
+          document.documentElement.classList.remove('dark-mode');
+          localStorage.setItem('theme', 'light');
+        }
+      });
+    }
+
 </body>
 </html>

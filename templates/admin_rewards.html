@@ -1,0 +1,159 @@
+{% extends 'admin_base.html' %}
+{% set title = 'Rewards | CCS Sit-in Monitoring' %}
+
+{% block content %}
+<div class="row g-4">
+  <div class="col-lg-5">
+    <div class="info-card h-100">
+      <h5 class="mb-3">Reward Inventory</h5>
+      <form class="row g-2 mb-3" method="POST" action="/admin/rewards/create">
+        <div class="col-12">
+          <input class="form-control" type="text" name="name" placeholder="Reward name" required>
+        </div>
+        <div class="col-12">
+          <input class="form-control" type="text" name="description" placeholder="Description">
+        </div>
+        <div class="col-6">
+          <input class="form-control" type="number" name="points_cost" placeholder="Points" min="1" required>
+        </div>
+        <div class="col-6">
+          <select class="form-select" name="is_physical">
+            <option value="0">Non-physical</option>
+            <option value="1">Physical</option>
+          </select>
+        </div>
+        <div class="col-6">
+          <input class="form-control" type="number" name="stock" placeholder="Stock (if physical)" min="0">
+        </div>
+        <div class="col-6">
+          <select class="form-select" name="status">
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
+        <div class="col-12 d-grid">
+          <button class="btn btn-success" type="submit">Add Reward</button>
+        </div>
+      </form>
+
+      <div class="table-responsive">
+        <table class="table align-middle table-compact">
+          <thead>
+            <tr>
+              <th>Reward</th>
+              <th>Cost</th>
+              <th>Stock</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for reward in rewards %}
+              <tr>
+                <td>
+                  <div class="fw-semibold">{{ reward.name }}</div>
+                  <div class="small text-muted">{{ reward.description or '' }}</div>
+                </td>
+                <td>{{ reward.points_cost }}</td>
+                <td>
+                  {% if reward.is_physical %}
+                    {{ reward.stock if reward.stock is not none else 0 }}
+                  {% else %}
+                    <span class="text-muted">N/A</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <span class="badge {% if reward.status == 'active' %}text-bg-success{% else %}text-bg-secondary{% endif %}">{{ reward.status|capitalize }}</span>
+                </td>
+              </tr>
+              <tr>
+                <td colspan="4">
+                  <form class="row g-2" method="POST" action="/admin/rewards/{{ reward.id }}/update">
+                    <div class="col-md-4">
+                      <input class="form-control form-control-sm" type="text" name="name" value="{{ reward.name }}" required>
+                    </div>
+                    <div class="col-md-4">
+                      <input class="form-control form-control-sm" type="text" name="description" value="{{ reward.description or '' }}">
+                    </div>
+                    <div class="col-md-2">
+                      <input class="form-control form-control-sm" type="number" name="points_cost" value="{{ reward.points_cost }}" min="1" required>
+                    </div>
+                    <div class="col-md-2">
+                      <select class="form-select form-select-sm" name="is_physical">
+                        <option value="0" {% if not reward.is_physical %}selected{% endif %}>Non-physical</option>
+                        <option value="1" {% if reward.is_physical %}selected{% endif %}>Physical</option>
+                      </select>
+                    </div>
+                    <div class="col-md-3">
+                      <input class="form-control form-control-sm" type="number" name="stock" value="{{ reward.stock if reward.stock is not none else '' }}" min="0" placeholder="Stock">
+                    </div>
+                    <div class="col-md-3">
+                      <select class="form-select form-select-sm" name="status">
+                        <option value="active" {% if reward.status == 'active' %}selected{% endif %}>Active</option>
+                        <option value="inactive" {% if reward.status == 'inactive' %}selected{% endif %}>Inactive</option>
+                      </select>
+                    </div>
+                    <div class="col-md-6 d-grid">
+                      <button class="btn btn-sm btn-primary" type="submit">Update</button>
+                    </div>
+                  </form>
+                </td>
+              </tr>
+            {% else %}
+              <tr><td colspan="4" class="text-center text-muted">No rewards added yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-7">
+    <div class="info-card">
+      <h5 class="mb-3">Redemption Requests</h5>
+      <div class="table-responsive">
+        <table class="table align-middle table-compact">
+          <thead>
+            <tr>
+              <th>Student</th>
+              <th>Reward</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in redemptions %}
+              <tr>
+                <td>
+                  <div class="fw-semibold">{{ row.student_name or '-' }}</div>
+                  <div class="small text-muted">{{ row.id_number }}</div>
+                </td>
+                <td>
+                  <div>{{ row.reward_name }}</div>
+                  <div class="small text-muted">{{ row.points_cost }} pts</div>
+                  {% if row.is_physical %}<span class="badge text-bg-warning">Physical</span>{% endif %}
+                </td>
+                <td>
+                  <span class="badge text-bg-secondary">{{ row.status|capitalize }}</span>
+                </td>
+                <td>
+                  <form class="d-flex flex-column gap-2" method="POST" action="/admin/redemptions/{{ row.id }}/status">
+                    <input class="form-control form-control-sm" type="text" name="admin_note" placeholder="Note (optional)">
+                    <div class="d-flex flex-wrap gap-2">
+                      <button class="btn btn-sm btn-success" type="submit" name="status" value="approved">Approve</button>
+                      <button class="btn btn-sm btn-primary" type="submit" name="status" value="ready">Ready</button>
+                      <button class="btn btn-sm btn-outline-success" type="submit" name="status" value="claimed">Claimed</button>
+                      <button class="btn btn-sm btn-danger" type="submit" name="status" value="denied">Deny</button>
+                    </div>
+                  </form>
+                </td>
+              </tr>
+            {% else %}
+              <tr><td colspan="4" class="text-center text-muted">No redemption requests yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -183,6 +183,7 @@ CREATE TABLE `users` (
   `middle_name` varchar(50) DEFAULT NULL,
   `course` varchar(50) DEFAULT NULL,
   `course_level` varchar(20) DEFAULT NULL,
+  `lab_assigned` varchar(20) DEFAULT NULL,
   `email` varchar(100) DEFAULT NULL,
   `address` varchar(100) DEFAULT NULL,
   `password` varchar(255) DEFAULT NULL,
