@@ -1,10 +1,11 @@
-from flask import Flask, render_template, request, redirect, session, flash, url_for, send_file, jsonify
+from flask import Flask, render_template, request, redirect, session, flash, url_for, send_file, jsonify, make_response
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 import mysql.connector
 import os
 import io
 import importlib
+import mimetypes
 from datetime import datetime
 from urllib.parse import urlencode
 
@@ -12,6 +13,41 @@ app = Flask(__name__)
 app.secret_key = os.urandom(24)
 app.config['UPLOAD_FOLDER'] = os.path.join('static', 'uploads')
 app.config['SOFTWARE_UPLOAD_FOLDER'] = os.path.join('static', 'uploads', 'software')
+
+
+# Compatibility helper to send attachments across Flask versions.
+def send_attachment(data, filename, mimetype=None):
+    """
+    Return a Flask response that prompts the client to download `filename`.
+    `data` may be a file path, a bytes object, or a file-like object.
+    """
+    if mimetype is None:
+        mimetype = mimetypes.guess_type(filename)[0] or 'application/octet-stream'
+
+    # Read bytes from file path
+    if isinstance(data, (str, os.PathLike)) and os.path.exists(str(data)):
+        with open(str(data), 'rb') as f:
+            payload = f.read()
+    # File-like object
+    elif hasattr(data, 'read'):
+        try:
+            data.seek(0)
+        except Exception:
+            pass
+        payload = data.read()
+        if isinstance(payload, str):
+            payload = payload.encode()
+    # Raw bytes
+    elif isinstance(data, (bytes, bytearray)):
+        payload = bytes(data)
+    else:
+        payload = str(data).encode()
+
+    resp = make_response(payload)
+    resp.headers.set('Content-Type', mimetype)
+    resp.headers.set('Content-Disposition', f'attachment; filename="{filename}"')
+    resp.headers.set('Content-Length', str(len(payload)))
+    return resp
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 ALLOWED_SOFTWARE_EXTENSIONS = {'exe', 'msi', 'zip', 'rar', '7z', 'pdf', 'doc', 'docx'}
@@ -1987,10 +2023,14 @@ def admin_sit_in_reports_pdf():
 
     pdf.setFont('Helvetica-Bold', 10)
     headers = ['ID', 'Student', 'Course', 'Lab', 'Purpose', 'Status', 'Started', 'Ended']
-    col_widths = [0.5, 1.5, 1.2, 1.0, 2.2, 0.7, 1.2, 1.2]
+    # Column widths (in inches) chosen to fit landscape letter with margins
+    # Adjusted to give more room for the Status/Started/Ended columns
+    col_widths = [0.4, 2.0, 0.9, 1.0, 1.6, 0.8, 1.2, 1.2]
     col_positions = [margin]
-    for width_ratio in col_widths[:-1]:
-        col_positions.append(col_positions[-1] + width_ratio * inch)
+    for w in col_widths[:-1]:
+        col_positions.append(col_positions[-1] + w * inch)
+    # Right boundaries for right-aligned columns (small inner margin)
+    col_rights = [col_positions[i] + col_widths[i] * inch - 6 for i in range(len(col_widths))]
 
     y = height - margin - 50
     for idx, header in enumerate(headers):
@@ -1998,7 +2038,9 @@ def admin_sit_in_reports_pdf():
     pdf.line(margin, y - 2, width - margin, y - 2)
     y -= 16
 
-    pdf.setFont('Helvetica', 9)
+    pdf.setFont('Helvetica', 8)
+    # approximate character limits per column (used for truncation)
+    max_chars = [6, 40, 12, 16, 30, 12, 20, 20]
     for record in history:
         if y < margin:
             pdf.showPage()
@@ -2006,22 +2048,30 @@ def admin_sit_in_reports_pdf():
             for idx, header in enumerate(headers):
                 pdf.drawString(col_positions[idx], height - margin, header)
             pdf.line(margin, height - margin - 2, width - margin, height - margin - 2)
-            pdf.setFont('Helvetica', 9)
+            pdf.setFont('Helvetica', 8)
             y = height - margin - 16
 
         values = [
             str(record['session_no'] or record['id']),
-            record['full_name'],
-            (record['course'] or ''),
-            record['lab_label'],
-            (record['purpose'] or 'General use'),
-            record['status'].capitalize(),
-            record['started_at'].strftime('%Y-%m-%d %H:%M') if record['started_at'] else '',
-            record['ended_at'].strftime('%Y-%m-%d %H:%M') if record['ended_at'] else ''
+            (record.get('full_name') or ''),
+            (record.get('course') or ''),
+            (record.get('lab_label') or ''),
+            (record.get('purpose') or 'General use'),
+            (record.get('status') or '').capitalize(),
+            record['started_at'].strftime('%Y-%m-%d %H:%M') if record.get('started_at') else '',
+            record['ended_at'].strftime('%Y-%m-%d %H:%M') if record.get('ended_at') else ''
         ]
         for idx, value in enumerate(values):
-            pdf.drawString(col_positions[idx], y, value)
-        y -= 14
+            text = str(value or '')
+            limit = max_chars[idx] if idx < len(max_chars) else 40
+            if len(text) > limit:
+                text = text[: max(0, limit - 3)] + '...'
+            # Right-align the date/time columns to keep them tidy
+            if idx in (6, 7):
+                pdf.drawRightString(col_rights[idx], y, text)
+            else:
+                pdf.drawString(col_positions[idx], y, text)
+        y -= 12
 
     pdf.setFont('Helvetica-Bold', 10)
     pdf.drawString(margin, y - 10, f"Total records: {summary['total']} | Completed: {summary['completed']} | Active: {summary['active']}")
@@ -2029,11 +2079,17 @@ def admin_sit_in_reports_pdf():
     pdf.save()
     buffer.seek(0)
 
-    filename = 'sit_in_report.pdf'
-    if form_values['date_from'] and form_values['date_to']:
-        filename = f"sit_in_report_{form_values['date_from']}_to_{form_values['date_to']}.pdf"
+    # Generate filename including today's date for clarity
+    today_str = datetime.now().strftime('%Y-%m-%d')
+    if form_values.get('date_from') and form_values.get('date_to'):
+        filename = f"sit_in_report_{form_values['date_from']}_to_{form_values['date_to']}_{today_str}.pdf"
+    elif form_values.get('date_from') or form_values.get('date_to'):
+        df = form_values.get('date_from') or form_values.get('date_to')
+        filename = f"sit_in_report_{df}_{today_str}.pdf"
+    else:
+        filename = f"sit_in_report_{today_str}.pdf"
 
-    return send_file(buffer, download_name=filename, as_attachment=True, mimetype='application/pdf')
+    return send_attachment(buffer, filename, mimetype='application/pdf')
 
 
 @app.route('/admin/reservations')
@@ -3043,7 +3099,7 @@ def download_software(asset_id):
         flash('File is missing on the server.', 'warning')
         return redirect('/software')
 
-    return send_file(file_path, as_attachment=True, download_name=row['original_name'])
+    return send_attachment(file_path, row['original_name'])
 
 
 @app.route('/shop/redeem', methods=['POST'])
