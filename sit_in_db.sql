@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: May 04, 2026 at 03:59 PM
+-- Generation Time: May 19, 2026 at 10:50 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -77,7 +77,6 @@ CREATE TABLE `reservations` (
 INSERT INTO `reservations` (`id`, `student_id_number`, `lab_code`, `seat_no`, `purpose`, `reservation_date`, `reservation_slot`, `status`, `admin_note`, `created_at`, `decided_at`, `decided_by`) VALUES
 (1, 'admin-seat-block', 'LAB524', 4, 'Admin seat block', '2026-04-13', '07:30-09:00', 'approved', 'Occupied by admin seat panel', '2026-04-13 22:32:37', '2026-04-13 22:32:37', 'adm-1234'),
 (2, 'admin-seat-block', 'LAB524', 3, 'Admin seat block', '2026-04-13', '07:30-09:00', 'approved', 'Occupied by admin seat panel', '2026-04-13 22:32:40', '2026-04-13 22:32:40', 'adm-1234'),
-(3, 'admin-seat-block', 'LAB524', 5, 'Admin seat block', '2026-04-13', '07:30-09:00', 'cancelled', 'Released from admin seat panel', '2026-04-13 22:32:43', '2026-04-13 22:32:44', 'adm-1234'),
 (4, 'admin-seat-block', 'LAB524', 5, 'Admin seat block', '2026-04-13', '07:30-09:00', 'approved', 'Occupied by admin seat panel', '2026-04-13 22:32:45', '2026-04-13 22:32:45', 'adm-1234'),
 (5, 'admin-seat-block', 'LAB524', 10, 'Admin seat block', '2026-04-13', '07:30-09:00', 'approved', 'Occupied by admin seat panel', '2026-04-13 22:32:45', '2026-04-13 22:32:45', 'adm-1234'),
 (6, 'admin-seat-block', 'LAB524', 9, 'Admin seat block', '2026-04-13', '07:30-09:00', 'approved', 'Occupied by admin seat panel', '2026-04-13 22:32:45', '2026-04-13 22:32:45', 'adm-1234'),
@@ -89,57 +88,58 @@ INSERT INTO `reservations` (`id`, `student_id_number`, `lab_code`, `seat_no`, `p
 (12, 'admin-seat-block', 'LAB524', 3, 'Admin seat block', '2026-04-22', '07:30-09:00', 'approved', 'Occupied by admin seat panel', '2026-04-22 21:32:46', '2026-04-22 21:32:46', 'adm-1234'),
 (13, 'admin-seat-block', 'LAB524', 4, 'Admin seat block', '2026-04-22', '07:30-09:00', 'approved', 'Occupied by admin seat panel', '2026-04-22 21:32:47', '2026-04-22 21:32:47', 'adm-1234'),
 (14, '62746040', 'LAB528', 2, 'JavaScript', '2026-04-22', '07:30-09:00', 'checked_in', NULL, '2026-04-22 22:07:42', '2026-04-22 22:07:55', 'adm-1234'),
-(15, 'admin-seat-block', 'LAB524', 1, 'Admin seat block', '2026-05-04', '07:30-09:00', 'cancelled', 'Released from admin seat panel', '2026-05-04 21:54:41', '2026-05-04 21:54:48', 'adm-1234'),
-(16, 'admin-seat-block', 'LAB524', 2, 'Admin seat block', '2026-05-04', '07:30-09:00', 'cancelled', 'Released from admin seat panel', '2026-05-04 21:54:41', '2026-05-04 21:54:48', 'adm-1234'),
-(17, 'admin-seat-block', 'LAB524', 3, 'Admin seat block', '2026-05-04', '07:30-09:00', 'cancelled', 'Released from admin seat panel', '2026-05-04 21:54:41', '2026-05-04 21:54:48', 'adm-1234'),
-(18, 'admin-seat-block', 'LAB524', 4, 'Admin seat block', '2026-05-04', '07:30-09:00', 'cancelled', 'Released from admin seat panel', '2026-05-04 21:54:41', '2026-05-04 21:54:48', 'adm-1234'),
-(19, 'admin-seat-block', 'LAB524', 5, 'Admin seat block', '2026-05-04', '07:30-09:00', 'cancelled', 'Released from admin seat panel', '2026-05-04 21:54:41', '2026-05-04 21:54:48', 'adm-1234'),
-(20, 'admin-seat-block', 'LAB524', 6, 'Admin seat block', '2026-05-04', '07:30-09:00', 'cancelled', 'Released from admin seat panel', '2026-05-04 21:54:41', '2026-05-04 21:54:48', 'adm-1234'),
-(21, 'admin-seat-block', 'LAB524', 7, 'Admin seat block', '2026-05-04', '07:30-09:00', 'cancelled', 'Released from admin seat panel', '2026-05-04 21:54:41', '2026-05-04 21:54:48', 'adm-1234'),
-(22, 'admin-seat-block', 'LAB524', 8, 'Admin seat block', '2026-05-04', '07:30-09:00', 'cancelled', 'Released from admin seat panel', '2026-05-04 21:54:41', '2026-05-04 21:54:48', 'adm-1234'),
-(23, 'admin-seat-block', 'LAB524', 9, 'Admin seat block', '2026-05-04', '07:30-09:00', 'cancelled', 'Released from admin seat panel', '2026-05-04 21:54:41', '2026-05-04 21:54:48', 'adm-1234'),
-(24, 'admin-seat-block', 'LAB524', 10, 'Admin seat block', '2026-05-04', '07:30-09:00', 'cancelled', 'Released from admin seat panel', '2026-05-04 21:54:41', '2026-05-04 21:54:48', 'adm-1234'),
-(25, 'admin-seat-block', 'LAB524', 11, 'Admin seat block', '2026-05-04', '07:30-09:00', 'cancelled', 'Released from admin seat panel', '2026-05-04 21:54:41', '2026-05-04 21:54:48', 'adm-1234'),
-(26, 'admin-seat-block', 'LAB524', 12, 'Admin seat block', '2026-05-04', '07:30-09:00', 'cancelled', 'Released from admin seat panel', '2026-05-04 21:54:41', '2026-05-04 21:54:48', 'adm-1234'),
-(27, 'admin-seat-block', 'LAB524', 13, 'Admin seat block', '2026-05-04', '07:30-09:00', 'cancelled', 'Released from admin seat panel', '2026-05-04 21:54:41', '2026-05-04 21:54:48', 'adm-1234'),
-(28, 'admin-seat-block', 'LAB524', 14, 'Admin seat block', '2026-05-04', '07:30-09:00', 'cancelled', 'Released from admin seat panel', '2026-05-04 21:54:41', '2026-05-04 21:54:48', 'adm-1234'),
-(29, 'admin-seat-block', 'LAB524', 15, 'Admin seat block', '2026-05-04', '07:30-09:00', 'cancelled', 'Released from admin seat panel', '2026-05-04 21:54:41', '2026-05-04 21:54:48', 'adm-1234'),
-(30, 'admin-seat-block', 'LAB524', 16, 'Admin seat block', '2026-05-04', '07:30-09:00', 'cancelled', 'Released from admin seat panel', '2026-05-04 21:54:41', '2026-05-04 21:54:48', 'adm-1234'),
-(31, 'admin-seat-block', 'LAB524', 17, 'Admin seat block', '2026-05-04', '07:30-09:00', 'cancelled', 'Released from admin seat panel', '2026-05-04 21:54:41', '2026-05-04 21:54:48', 'adm-1234'),
-(32, 'admin-seat-block', 'LAB524', 18, 'Admin seat block', '2026-05-04', '07:30-09:00', 'cancelled', 'Released from admin seat panel', '2026-05-04 21:54:41', '2026-05-04 21:54:48', 'adm-1234'),
-(33, 'admin-seat-block', 'LAB524', 19, 'Admin seat block', '2026-05-04', '07:30-09:00', 'cancelled', 'Released from admin seat panel', '2026-05-04 21:54:41', '2026-05-04 21:54:48', 'adm-1234'),
-(34, 'admin-seat-block', 'LAB524', 20, 'Admin seat block', '2026-05-04', '07:30-09:00', 'cancelled', 'Released from admin seat panel', '2026-05-04 21:54:41', '2026-05-04 21:54:48', 'adm-1234'),
-(35, 'admin-seat-block', 'LAB524', 21, 'Admin seat block', '2026-05-04', '07:30-09:00', 'cancelled', 'Released from admin seat panel', '2026-05-04 21:54:41', '2026-05-04 21:54:48', 'adm-1234'),
-(36, 'admin-seat-block', 'LAB524', 22, 'Admin seat block', '2026-05-04', '07:30-09:00', 'cancelled', 'Released from admin seat panel', '2026-05-04 21:54:41', '2026-05-04 21:54:48', 'adm-1234'),
-(37, 'admin-seat-block', 'LAB524', 23, 'Admin seat block', '2026-05-04', '07:30-09:00', 'cancelled', 'Released from admin seat panel', '2026-05-04 21:54:41', '2026-05-04 21:54:48', 'adm-1234'),
-(38, 'admin-seat-block', 'LAB524', 24, 'Admin seat block', '2026-05-04', '07:30-09:00', 'cancelled', 'Released from admin seat panel', '2026-05-04 21:54:41', '2026-05-04 21:54:48', 'adm-1234'),
-(39, 'admin-seat-block', 'LAB524', 25, 'Admin seat block', '2026-05-04', '07:30-09:00', 'cancelled', 'Released from admin seat panel', '2026-05-04 21:54:41', '2026-05-04 21:54:48', 'adm-1234'),
-(40, 'admin-seat-block', 'LAB524', 26, 'Admin seat block', '2026-05-04', '07:30-09:00', 'cancelled', 'Released from admin seat panel', '2026-05-04 21:54:41', '2026-05-04 21:54:48', 'adm-1234'),
-(41, 'admin-seat-block', 'LAB524', 27, 'Admin seat block', '2026-05-04', '07:30-09:00', 'cancelled', 'Released from admin seat panel', '2026-05-04 21:54:41', '2026-05-04 21:54:48', 'adm-1234'),
-(42, 'admin-seat-block', 'LAB524', 28, 'Admin seat block', '2026-05-04', '07:30-09:00', 'cancelled', 'Released from admin seat panel', '2026-05-04 21:54:41', '2026-05-04 21:54:48', 'adm-1234'),
-(43, 'admin-seat-block', 'LAB524', 29, 'Admin seat block', '2026-05-04', '07:30-09:00', 'cancelled', 'Released from admin seat panel', '2026-05-04 21:54:41', '2026-05-04 21:54:48', 'adm-1234'),
-(44, 'admin-seat-block', 'LAB524', 30, 'Admin seat block', '2026-05-04', '07:30-09:00', 'cancelled', 'Released from admin seat panel', '2026-05-04 21:54:41', '2026-05-04 21:54:48', 'adm-1234'),
-(45, 'admin-seat-block', 'LAB524', 31, 'Admin seat block', '2026-05-04', '07:30-09:00', 'cancelled', 'Released from admin seat panel', '2026-05-04 21:54:41', '2026-05-04 21:54:48', 'adm-1234'),
-(46, 'admin-seat-block', 'LAB524', 32, 'Admin seat block', '2026-05-04', '07:30-09:00', 'cancelled', 'Released from admin seat panel', '2026-05-04 21:54:41', '2026-05-04 21:54:48', 'adm-1234'),
-(47, 'admin-seat-block', 'LAB524', 33, 'Admin seat block', '2026-05-04', '07:30-09:00', 'cancelled', 'Released from admin seat panel', '2026-05-04 21:54:41', '2026-05-04 21:54:48', 'adm-1234'),
-(48, 'admin-seat-block', 'LAB524', 34, 'Admin seat block', '2026-05-04', '07:30-09:00', 'cancelled', 'Released from admin seat panel', '2026-05-04 21:54:41', '2026-05-04 21:54:48', 'adm-1234'),
-(49, 'admin-seat-block', 'LAB524', 35, 'Admin seat block', '2026-05-04', '07:30-09:00', 'cancelled', 'Released from admin seat panel', '2026-05-04 21:54:41', '2026-05-04 21:54:48', 'adm-1234'),
-(50, 'admin-seat-block', 'LAB524', 36, 'Admin seat block', '2026-05-04', '07:30-09:00', 'cancelled', 'Released from admin seat panel', '2026-05-04 21:54:41', '2026-05-04 21:54:48', 'adm-1234'),
-(51, 'admin-seat-block', 'LAB524', 37, 'Admin seat block', '2026-05-04', '07:30-09:00', 'cancelled', 'Released from admin seat panel', '2026-05-04 21:54:41', '2026-05-04 21:54:48', 'adm-1234'),
-(52, 'admin-seat-block', 'LAB524', 38, 'Admin seat block', '2026-05-04', '07:30-09:00', 'cancelled', 'Released from admin seat panel', '2026-05-04 21:54:41', '2026-05-04 21:54:48', 'adm-1234'),
-(53, 'admin-seat-block', 'LAB524', 39, 'Admin seat block', '2026-05-04', '07:30-09:00', 'cancelled', 'Released from admin seat panel', '2026-05-04 21:54:41', '2026-05-04 21:54:48', 'adm-1234'),
-(54, 'admin-seat-block', 'LAB524', 40, 'Admin seat block', '2026-05-04', '07:30-09:00', 'cancelled', 'Released from admin seat panel', '2026-05-04 21:54:41', '2026-05-04 21:54:48', 'adm-1234'),
-(55, 'admin-seat-block', 'LAB524', 41, 'Admin seat block', '2026-05-04', '07:30-09:00', 'cancelled', 'Released from admin seat panel', '2026-05-04 21:54:41', '2026-05-04 21:54:48', 'adm-1234'),
-(56, 'admin-seat-block', 'LAB524', 42, 'Admin seat block', '2026-05-04', '07:30-09:00', 'cancelled', 'Released from admin seat panel', '2026-05-04 21:54:41', '2026-05-04 21:54:48', 'adm-1234'),
-(57, 'admin-seat-block', 'LAB524', 43, 'Admin seat block', '2026-05-04', '07:30-09:00', 'cancelled', 'Released from admin seat panel', '2026-05-04 21:54:41', '2026-05-04 21:54:48', 'adm-1234'),
-(58, 'admin-seat-block', 'LAB524', 44, 'Admin seat block', '2026-05-04', '07:30-09:00', 'cancelled', 'Released from admin seat panel', '2026-05-04 21:54:41', '2026-05-04 21:54:48', 'adm-1234'),
-(59, 'admin-seat-block', 'LAB524', 45, 'Admin seat block', '2026-05-04', '07:30-09:00', 'cancelled', 'Released from admin seat panel', '2026-05-04 21:54:41', '2026-05-04 21:54:48', 'adm-1234'),
-(60, 'admin-seat-block', 'LAB524', 46, 'Admin seat block', '2026-05-04', '07:30-09:00', 'cancelled', 'Released from admin seat panel', '2026-05-04 21:54:41', '2026-05-04 21:54:48', 'adm-1234'),
-(61, 'admin-seat-block', 'LAB524', 47, 'Admin seat block', '2026-05-04', '07:30-09:00', 'cancelled', 'Released from admin seat panel', '2026-05-04 21:54:41', '2026-05-04 21:54:48', 'adm-1234'),
-(62, 'admin-seat-block', 'LAB524', 48, 'Admin seat block', '2026-05-04', '07:30-09:00', 'cancelled', 'Released from admin seat panel', '2026-05-04 21:54:41', '2026-05-04 21:54:48', 'adm-1234'),
-(63, 'admin-seat-block', 'LAB524', 49, 'Admin seat block', '2026-05-04', '07:30-09:00', 'cancelled', 'Released from admin seat panel', '2026-05-04 21:54:41', '2026-05-04 21:54:48', 'adm-1234'),
-(64, 'admin-seat-block', 'LAB524', 50, 'Admin seat block', '2026-05-04', '07:30-09:00', 'cancelled', 'Released from admin seat panel', '2026-05-04 21:54:41', '2026-05-04 21:54:48', 'adm-1234'),
-(65, 'admin-seat-block', 'LAB524', 5, 'Admin seat block', '2026-05-04', '07:30-09:00', 'cancelled', 'Released from admin seat panel', '2026-05-04 21:54:53', '2026-05-04 21:54:55', 'adm-1234');
+(66, '62746040', 'LAB524', 1, 'Python', '2026-05-19', '07:30-09:00', 'checked_in', NULL, '2026-05-19 03:14:27', '2026-05-19 03:14:44', 'adm-1234'),
+(67, 'barnae', 'LAB524', 2, 'C#', '2026-05-19', '07:30-09:00', 'checked_in', NULL, '2026-05-19 12:38:05', '2026-05-19 12:38:35', 'adm-1234');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `rewards`
+--
+
+CREATE TABLE `rewards` (
+  `id` int(11) NOT NULL,
+  `name` varchar(100) NOT NULL,
+  `description` text DEFAULT NULL,
+  `points_cost` int(11) NOT NULL,
+  `is_physical` tinyint(1) NOT NULL DEFAULT 0,
+  `stock` int(11) DEFAULT NULL,
+  `status` enum('active','inactive') NOT NULL DEFAULT 'active',
+  `created_at` datetime NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `rewards`
+--
+
+INSERT INTO `rewards` (`id`, `name`, `description`, `points_cost`, `is_physical`, `stock`, `status`, `created_at`) VALUES
+(1, 'CCS Sticker Pack', 'Official CCS sticker set.', 20, 1, 50, 'active', '2026-05-19 02:15:01'),
+(2, 'Lanyard / ID Holder', 'CCS lanyard with ID holder.', 40, 1, 0, 'active', '2026-05-19 02:15:01'),
+(3, 'Notebook / Pen Set', 'Branded notebook and pen.', 60, 1, 15, 'active', '2026-05-19 02:15:01'),
+(4, 'Extra 30 Minutes Lab Time', 'Extend a lab session by 30 minutes.', 15, 0, NULL, 'active', '2026-05-19 02:15:01'),
+(5, 'Leaderboard Highlight Badge (1 Week)', 'Show a highlight badge for one week.', 50, 0, NULL, 'active', '2026-05-19 02:15:01'),
+(6, 'CCS T-Shirt', 'Limited edition CCS shirt.', 200, 1, 5, 'active', '2026-05-19 02:15:01');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `reward_redemptions`
+--
+
+CREATE TABLE `reward_redemptions` (
+  `id` int(11) NOT NULL,
+  `reward_id` int(11) NOT NULL,
+  `reward_name` varchar(100) NOT NULL,
+  `student_id_number` varchar(20) NOT NULL,
+  `points_cost` int(11) NOT NULL,
+  `is_physical` tinyint(1) NOT NULL DEFAULT 0,
+  `status` enum('pending','approved','ready','claimed','denied','cancelled') NOT NULL DEFAULT 'pending',
+  `admin_note` varchar(255) DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `updated_at` datetime DEFAULT NULL,
+  `ready_at` datetime DEFAULT NULL,
+  `claimed_at` datetime DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -167,7 +167,40 @@ INSERT INTO `sit_in_logs` (`id`, `student_id_number`, `purpose`, `lab`, `session
 (2, '123456789', 'C', 'LAB102', 1, 'completed', '2026-03-25 19:32:29', '2026-03-25 19:47:24'),
 (3, '23743842', 'General use', 'LAB524', 1, 'completed', '2026-04-14 02:17:17', '2026-04-14 02:17:26'),
 (4, '62746040', 'General use', 'LAB524', 1, 'completed', '2026-04-22 21:32:42', '2026-04-22 21:32:58'),
-(5, '62746040', 'General use', 'LAB528', 2, 'completed', '2026-04-22 22:07:55', '2026-04-22 22:08:05');
+(5, '62746040', 'General use', 'LAB528', 2, 'completed', '2026-04-22 22:07:55', '2026-04-22 22:08:05'),
+(6, 'barnae', 'Python', 'LAB524', 2, 'completed', '2026-05-19 03:04:37', '2026-05-19 03:12:21'),
+(7, 'barnae', 'Java', 'LAB524', 3, 'completed', '2026-05-19 03:12:35', '2026-05-19 03:13:35'),
+(8, '62746040', 'General use', 'LAB524', 3, 'completed', '2026-05-19 03:14:44', '2026-05-19 03:16:07'),
+(9, 'barnae', 'ASP.Net', 'LAB530', 4, 'completed', '2026-05-19 03:26:11', '2026-05-19 03:27:19'),
+(10, '62746040', 'PHP', 'LAB524', 4, 'completed', '2026-05-19 03:29:39', '2026-05-19 03:30:10'),
+(11, 'barnae', 'General use', 'LAB524', 5, 'completed', '2026-05-19 12:38:35', '2026-05-19 12:43:25');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `software_assets`
+--
+
+CREATE TABLE `software_assets` (
+  `id` int(11) NOT NULL,
+  `title` varchar(150) NOT NULL,
+  `description` text DEFAULT NULL,
+  `lab_code` varchar(20) DEFAULT NULL,
+  `file_name` varchar(255) NOT NULL,
+  `original_name` varchar(255) NOT NULL,
+  `file_size` int(11) NOT NULL,
+  `uploaded_by` varchar(50) DEFAULT NULL,
+  `status` enum('active','inactive') NOT NULL DEFAULT 'active',
+  `created_at` datetime NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `software_assets`
+--
+
+INSERT INTO `software_assets` (`id`, `title`, `description`, `lab_code`, `file_name`, `original_name`, `file_size`, `uploaded_by`, `status`, `created_at`) VALUES
+(1, 'TeamViewer Setup', 'installer for teamviewer', NULL, '20260519025307_TeamViewer_Setup_x64.exe', 'TeamViewer_Setup_x64.exe', 109588176, 'adm-1234', 'active', '2026-05-19 02:53:07'),
+(2, 'Figma Setup', 'installer', 'LAB526', '20260519030521_FigmaSetup.exe', 'FigmaSetup.exe', 140551248, 'adm-1234', 'active', '2026-05-19 03:05:21');
 
 -- --------------------------------------------------------
 
@@ -183,23 +216,23 @@ CREATE TABLE `users` (
   `middle_name` varchar(50) DEFAULT NULL,
   `course` varchar(50) DEFAULT NULL,
   `course_level` varchar(20) DEFAULT NULL,
-  `lab_assigned` varchar(20) DEFAULT NULL,
   `email` varchar(100) DEFAULT NULL,
   `address` varchar(100) DEFAULT NULL,
   `password` varchar(255) DEFAULT NULL,
-  `photo_path` varchar(255) DEFAULT NULL
+  `photo_path` varchar(255) DEFAULT NULL,
+  `lab_assigned` varchar(20) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `users`
 --
 
-INSERT INTO `users` (`id`, `id_number`, `last_name`, `first_name`, `middle_name`, `course`, `course_level`, `email`, `address`, `password`, `photo_path`) VALUES
-(1, '23743842', 'Garcia', 'Nichole', 'Maraguinot', 'BSIT', '3', 'garcia@email.com', '57 Sampaguita St, PBN Housing, Cebu City', 'scrypt:32768:8:1$L43En3n6cnHkTzSz$f2bc7f3b73fad19850d382af1885ad259a843c86108bd5d5d59646032a32182a530d811eba8c1296872636dc476cb2fcaaa2bd31744d734317b9e3d924f31e55', 'uploads/23743842.png'),
-(2, '123456789', 'Garcia', 'Sean', 'Maraguinot', 'BSIT', '1', '123@gmail.com', '57 Sampaguita St, PBN Housing', 'scrypt:32768:8:1$9AgmQ7iYe9v9DlAD$f019d5f780dc5a9b699e93329908245f5e863bd8edae5653af1d9a6e126b2e308bb8315781037cd6450b809bd1dbbb0c71d030394dbf3db009e96fc00c24951a', 'uploads/123456789.jpg'),
-(3, 'adm-1234', 'Admin', 'CCS', '', 'ADMIN', '0', 'admin@example.com', 'N/A', 'scrypt:32768:8:1$awa3xo6nSwqGIpLJ$6cdf5a11b7b7d237eadc4fac988ba6308558e4604e5ac202ba76f03c9b748d18c4ffab6e45232a9a536589d55a90c4dc913355da1832d26bc7ff5553a06d9ffb', NULL),
-(5, 'barnae', 'Garcia', 'Nichole Anne', 'Maraguinot', 'BSIT', '3', 'xyeahgirlx@gmail.com', '8V8W+MX7', 'scrypt:32768:8:1$iJeh4HsPfXDbfgNm$ca405eb00ef858c3d1d16a3a7b4a71aa9fa5955c9c146d1ed186cf223a20df900560d602ac97c75506495482ac2c497e88adb7c63facf1b39de558381ae3c9d9', NULL),
-(6, '62746040', 'Garcia', 'Nichole', 'Maraguinot', 'BSIT', '3', 'email@email.com', '1234 St. ', 'scrypt:32768:8:1$z2jxVP8xvA9EKS5i$ba0df74957a5f748fce82f8d7db5d5be2cd36e33a38f445326ff4a1df22e369bf45b3de1eeaf111002859402391edc38eff4a793755c445bd0bf7ab3c4704def', 'uploads/62746040.png');
+INSERT INTO `users` (`id`, `id_number`, `last_name`, `first_name`, `middle_name`, `course`, `course_level`, `email`, `address`, `password`, `photo_path`, `lab_assigned`) VALUES
+(1, '23743842', 'Garcia', 'Nichole', 'Maraguinot', 'BSIT', '3', 'garcia@email.com', '57 Sampaguita St, PBN Housing, Cebu City', 'scrypt:32768:8:1$L43En3n6cnHkTzSz$f2bc7f3b73fad19850d382af1885ad259a843c86108bd5d5d59646032a32182a530d811eba8c1296872636dc476cb2fcaaa2bd31744d734317b9e3d924f31e55', 'uploads/23743842.png', NULL),
+(2, '123456789', 'Garcia', 'Sean', 'Maraguinot', 'BSIT', '1', '123@gmail.com', '57 Sampaguita St, PBN Housing', 'scrypt:32768:8:1$9AgmQ7iYe9v9DlAD$f019d5f780dc5a9b699e93329908245f5e863bd8edae5653af1d9a6e126b2e308bb8315781037cd6450b809bd1dbbb0c71d030394dbf3db009e96fc00c24951a', 'uploads/123456789.jpg', NULL),
+(3, 'adm-1234', 'Admin', 'CCS', '', 'ADMIN', '0', 'admin@example.com', 'N/A', 'scrypt:32768:8:1$awa3xo6nSwqGIpLJ$6cdf5a11b7b7d237eadc4fac988ba6308558e4604e5ac202ba76f03c9b748d18c4ffab6e45232a9a536589d55a90c4dc913355da1832d26bc7ff5553a06d9ffb', NULL, NULL),
+(5, 'barnae', 'Garcia', 'Nichole Anne', 'Maraguinot', 'BSIT', '3', 'xyeahgirlx@gmail.com', '8V8W+MX7', 'scrypt:32768:8:1$iJeh4HsPfXDbfgNm$ca405eb00ef858c3d1d16a3a7b4a71aa9fa5955c9c146d1ed186cf223a20df900560d602ac97c75506495482ac2c497e88adb7c63facf1b39de558381ae3c9d9', NULL, 'LAB530'),
+(6, '62746040', 'Garcia', 'Nichole', 'Maraguinot', 'BSIT', '3', 'email@email.com', '1234 St. ', 'scrypt:32768:8:1$z2jxVP8xvA9EKS5i$ba0df74957a5f748fce82f8d7db5d5be2cd36e33a38f445326ff4a1df22e369bf45b3de1eeaf111002859402391edc38eff4a793755c445bd0bf7ab3c4704def', 'uploads/62746040.png', 'LAB524');
 
 -- --------------------------------------------------------
 
@@ -253,12 +286,36 @@ ALTER TABLE `reservations`
   ADD KEY `idx_reservation_status` (`status`);
 
 --
+-- Indexes for table `rewards`
+--
+ALTER TABLE `rewards`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_rewards_status` (`status`);
+
+--
+-- Indexes for table `reward_redemptions`
+--
+ALTER TABLE `reward_redemptions`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_redemptions_student` (`student_id_number`),
+  ADD KEY `idx_redemptions_status` (`status`),
+  ADD KEY `fk_redemptions_reward` (`reward_id`);
+
+--
 -- Indexes for table `sit_in_logs`
 --
 ALTER TABLE `sit_in_logs`
   ADD PRIMARY KEY (`id`),
   ADD KEY `idx_student_id_number` (`student_id_number`),
   ADD KEY `idx_status` (`status`);
+
+--
+-- Indexes for table `software_assets`
+--
+ALTER TABLE `software_assets`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_software_status` (`status`),
+  ADD KEY `idx_software_lab` (`lab_code`);
 
 --
 -- Indexes for table `users`
@@ -289,13 +346,31 @@ ALTER TABLE `announcements`
 -- AUTO_INCREMENT for table `reservations`
 --
 ALTER TABLE `reservations`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=66;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=165;
+
+--
+-- AUTO_INCREMENT for table `rewards`
+--
+ALTER TABLE `rewards`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+
+--
+-- AUTO_INCREMENT for table `reward_redemptions`
+--
+ALTER TABLE `reward_redemptions`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `sit_in_logs`
 --
 ALTER TABLE `sit_in_logs`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=12;
+
+--
+-- AUTO_INCREMENT for table `software_assets`
+--
+ALTER TABLE `software_assets`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT for table `users`
@@ -312,6 +387,12 @@ ALTER TABLE `user_feedback`
 --
 -- Constraints for dumped tables
 --
+
+--
+-- Constraints for table `reward_redemptions`
+--
+ALTER TABLE `reward_redemptions`
+  ADD CONSTRAINT `fk_redemptions_reward` FOREIGN KEY (`reward_id`) REFERENCES `rewards` (`id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `user_feedback`

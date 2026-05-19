@@ -147,7 +147,7 @@
     <div class="info-card border-0 shadow-sm">
       <div class="d-flex justify-content-between align-items-center mb-4">
         <h5 class="mb-0 fw-bold"><i class="bi bi-clock-history me-2"></i>Redemption Requests</h5>
-        <span class="badge bg-primary rounded-pill">{{ redemptions|length }} Pending</span>
+        <span class="badge bg-primary rounded-pill">{{ pending_count }} Pending</span>
       </div>
       <div class="table-responsive">
         <table class="table align-middle">
@@ -194,25 +194,13 @@
                     </button>
                     <div class="dropdown-menu dropdown-menu-end p-3 shadow-lg border-0" style="min-width: 250px;">
                       <form method="POST" action="/admin/redemptions/{{ row.id }}/status">
-                        <div class="mb-3">
-                          <label class="form-label small fw-bold mb-1 text-muted">Award Points (Internal Adjustment)</label>
-                          <div class="input-group input-group-sm">
-                            <span class="input-group-text bg-light border-end-0 text-primary fw-bold"><i class="bi bi-star"></i></span>
-                            <input class="form-control border-start-0" type="number" name="points_awarded" value="0" min="0" max="1000">
-                          </div>
-                          <div class="form-text mt-0" style="font-size: 0.65rem;">Add bonus points for participation/cleanup</div>
-                        </div>
+                          <label class="form-label small fw-bold mb-2">Internal Note</label>
+                          <input class="form-control form-control-sm mb-3" type="text" name="admin_note" value="{{ row.admin_note or '' }}" placeholder="e.g., Claim at Lab 524">
 
-                        <label class="form-label small fw-bold mb-2">Internal Note</label>
-                        <input class="form-control form-control-sm mb-3" type="text" name="admin_note" value="{{ row.admin_note or '' }}" placeholder="e.g., Claim at Lab 524">
-                        
-                        <div class="d-grid gap-2">
-                          <button class="btn btn-sm btn-success" type="submit" name="status" value="approved">Approve</button>
-                          <button class="btn btn-sm btn-primary" type="submit" name="status" value="ready">Mark as Ready</button>
-                          <button class="btn btn-sm btn-outline-success" type="submit" name="status" value="claimed">Mark as Claimed</button>
-                          <div class="border-top my-1"></div>
-                          <button class="btn btn-sm btn-danger" type="submit" name="status" value="denied">Deny Request</button>
-                        </div>
+                          <div class="d-grid gap-2">
+                            <button class="btn btn-sm btn-primary" type="submit" name="status" value="ready">Mark as Ready</button>
+                            <button class="btn btn-sm btn-outline-success" type="submit" name="status" value="claimed">Mark as Claimed</button>
+                          </div>
                       </form>
                     </div>
                   </div>

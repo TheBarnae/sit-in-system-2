@@ -369,21 +369,93 @@ def ensure_reward_redemptions_table(db):
     cursor.close()
 
 
-def get_points_summary(cursor, student_id_number):
+def ensure_notifications_table(db):
+    cursor = db.cursor()
     cursor.execute("""
-        SELECT COALESCE(SUM(points_awarded), 0) AS earned_points
+        CREATE TABLE IF NOT EXISTS notifications (
+            id INT NOT NULL AUTO_INCREMENT,
+            student_id_number VARCHAR(20) NOT NULL,
+            message TEXT NOT NULL,
+            link VARCHAR(255) DEFAULT NULL,
+            status ENUM('unread','read') NOT NULL DEFAULT 'unread',
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            INDEX idx_notifications_student (student_id_number),
+            INDEX idx_notifications_status (status)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+    """)
+    # Backward-compatible alterations can be attempted silently
+    alter_stmts = [
+        "ALTER TABLE notifications ADD COLUMN link VARCHAR(255) DEFAULT NULL",
+        "ALTER TABLE notifications ADD COLUMN status ENUM('unread','read') NOT NULL DEFAULT 'unread'",
+    ]
+    for stmt in alter_stmts:
+        try:
+            cursor.execute(stmt)
+        except mysql.connector.Error:
+            pass
+    cursor.close()
+
+
+def get_points_summary(cursor, student_id_number):
+    # Sum admin-awarded points from feedback
+    cursor.execute("""
+        SELECT COALESCE(SUM(points_awarded), 0) AS admin_points
         FROM user_feedback
         WHERE student_id_number=%s
     """, (student_id_number,))
-    earned_points = (cursor.fetchone() or {}).get('earned_points', 0)
+    row = cursor.fetchone() or {}
+    if isinstance(row, dict):
+        admin_points = int(row.get('admin_points', 0) or 0)
+    else:
+        # fallback for non-dict cursors
+        try:
+            admin_points = int(row[0] or 0)
+        except Exception:
+            admin_points = 0
 
+    # Compute time-based points (same rule used by leaderboard: 1 point per 30 minutes average)
+    cursor.execute("""
+        SELECT AVG(
+            CASE
+                WHEN ended_at IS NOT NULL THEN TIMESTAMPDIFF(MINUTE, started_at, ended_at)
+                ELSE NULL
+            END
+        ) AS avg_minutes
+        FROM sit_in_logs
+        WHERE student_id_number=%s AND status='completed'
+    """, (student_id_number,))
+    row = cursor.fetchone() or {}
+    if isinstance(row, dict):
+        try:
+            avg_minutes = float(row.get('avg_minutes') or 0)
+        except Exception:
+            avg_minutes = 0.0
+    else:
+        try:
+            avg_minutes = float(row[0]) if row and row[0] is not None else 0.0
+        except Exception:
+            avg_minutes = 0.0
+
+    time_points = int(avg_minutes // 30) if avg_minutes else 0
+
+    earned_points = admin_points + time_points
+
+    # Sum points already spent (including pending/approved/ready/claimed)
     cursor.execute("""
         SELECT COALESCE(SUM(points_cost), 0) AS spent_points
         FROM reward_redemptions
         WHERE student_id_number=%s
           AND status IN ('pending', 'approved', 'ready', 'claimed')
     """, (student_id_number,))
-    spent_points = (cursor.fetchone() or {}).get('spent_points', 0)
+    row = cursor.fetchone() or {}
+    if isinstance(row, dict):
+        spent_points = int(row.get('spent_points', 0) or 0)
+    else:
+        try:
+            spent_points = int(row[0] or 0)
+        except Exception:
+            spent_points = 0
 
     available_points = max(int(earned_points) - int(spent_points), 0)
     return int(earned_points), int(spent_points), available_points
@@ -462,6 +534,35 @@ def fetch_announcements(limit=10, for_user=None):
             'target_level': row.get('target_level') or ''
         })
     return announcements
+
+
+def fetch_user_notifications(student_id, limit=10):
+    db = get_db()
+    ensure_notifications_table(db)
+    cursor = db.cursor(dictionary=True)
+    safe_limit = max(1, min(int(limit), 100))
+    cursor.execute("""
+        SELECT id, student_id_number, message, link, status, created_at
+        FROM notifications
+        WHERE student_id_number=%s
+        ORDER BY created_at DESC
+        LIMIT %s
+    """, (student_id, safe_limit))
+    rows = cursor.fetchall()
+    cursor.close()
+    db.close()
+
+    notifications = []
+    for row in rows:
+        created_at = row.get('created_at')
+        notifications.append({
+            'id': row.get('id'),
+            'message': row.get('message') or '',
+            'link': row.get('link') or '',
+            'status': row.get('status') or 'unread',
+            'date': created_at.strftime('%Y-%b-%d %H:%M') if created_at else ''
+        })
+    return notifications
 
 
 def fetch_sit_in_history(student_id=None, status=None, date_from=None, date_to=None):
@@ -2626,7 +2727,11 @@ def dashboard():
     announcements = fetch_announcements(limit=10, for_user=user)
     latest_announcement_id = announcements[0]['id'] if announcements else 0
     last_seen_announcement_id = session.get('last_seen_announcement_id', 0)
-    has_new_notifications = bool(latest_announcement_id and latest_announcement_id > last_seen_announcement_id)
+
+    # Fetch per-user notifications and compute notification indicator
+    user_notifications = fetch_user_notifications(user['id_number'], limit=10)
+    has_unread_user_notifications = any(n.get('status') == 'unread' for n in user_notifications)
+    has_new_notifications = bool(latest_announcement_id and latest_announcement_id > last_seen_announcement_id) or has_unread_user_notifications
 
     return render_template('dashboard.html',
                            user=user,
@@ -2636,6 +2741,7 @@ def dashboard():
                            active_session=active_session,
                            lab_cards=lab_cards,
                            announcements=announcements,
+                           user_notifications=user_notifications,
                            has_new_notifications=has_new_notifications,
                            recent_sessions=recent_sessions,
                            can_start_session=can_start_session,
@@ -2987,6 +3093,8 @@ def redeem_reward():
         flash('This item is out of stock.', 'warning')
         return redirect('/shop')
 
+    # Keep redemption requests pending for admin review regardless of type
+    # (avoids automatic approval that can confuse users).
     if reward['is_physical']:
         cursor.execute("""
             UPDATE rewards
@@ -2994,7 +3102,7 @@ def redeem_reward():
             WHERE id=%s AND stock > 0
         """, (reward_id,))
 
-    status = 'pending' if reward['is_physical'] else 'approved'
+    status = 'pending'
     cursor.execute("""
         INSERT INTO reward_redemptions (
             reward_id, reward_name, student_id_number, points_cost, is_physical, status
@@ -3005,10 +3113,7 @@ def redeem_reward():
     cursor.close()
     db.close()
 
-    if reward['is_physical']:
-        flash('Redemption submitted. We will notify you when it is ready for pickup.', 'success')
-    else:
-        flash('Reward redeemed successfully.', 'success')
+    flash('Redemption submitted. Admin will review and process your request.', 'success')
     return redirect('/shop')
 
 
@@ -3021,6 +3126,7 @@ def admin_rewards():
     db = get_db()
     ensure_rewards_table(db)
     ensure_reward_redemptions_table(db)
+    ensure_notifications_table(db)
     cursor = db.cursor(dictionary=True)
 
     cursor.execute("""
@@ -3043,13 +3149,16 @@ def admin_rewards():
     cursor.close()
     db.close()
 
+    pending_count = 0
     for row in redemptions:
+        if (row.get('status') or '').lower() == 'pending':
+            pending_count += 1
         full_name = f"{row.get('last_name') or ''}, {row.get('first_name') or ''}"
         if row.get('middle_name'):
             full_name = f"{full_name} {row['middle_name']}"
         row['student_name'] = full_name.strip(', ')
 
-    return render_template('admin_rewards.html', rewards=rewards, redemptions=redemptions)
+    return render_template('admin_rewards.html', rewards=rewards, redemptions=redemptions, pending_count=pending_count)
 
 
 @app.route('/admin/rewards/create', methods=['POST'])
@@ -3145,7 +3254,7 @@ def admin_update_redemption_status(redemption_id):
     status = (request.form.get('status') or '').strip()
     admin_note = (request.form.get('admin_note') or '').strip()
 
-    if status not in ('approved', 'ready', 'claimed', 'denied'):
+    if status not in ('ready', 'claimed'):
         flash('Invalid redemption status.', 'warning')
         return redirect('/admin/rewards')
 
@@ -3155,7 +3264,7 @@ def admin_update_redemption_status(redemption_id):
     cursor = db.cursor(dictionary=True)
 
     cursor.execute("""
-        SELECT id, reward_id, reward_name, is_physical, status
+        SELECT id, reward_id, reward_name, is_physical, status, student_id_number
         FROM reward_redemptions
         WHERE id=%s
         LIMIT 1
@@ -3168,12 +3277,7 @@ def admin_update_redemption_status(redemption_id):
         flash('Redemption not found.', 'warning')
         return redirect('/admin/rewards')
 
-    if status == 'denied' and redemption['is_physical']:
-        cursor.execute("""
-            UPDATE rewards
-            SET stock = stock + 1
-            WHERE id=%s
-        """, (redemption['reward_id'],))
+    # stock restoration or point-award flows were removed per simplified admin workflow
 
     ready_at = datetime.now() if status == 'ready' else None
     claimed_at = datetime.now() if status == 'claimed' else None
@@ -3188,6 +3292,22 @@ def admin_update_redemption_status(redemption_id):
         WHERE id=%s
     """, (status, admin_note or None, ready_at, claimed_at, redemption_id))
     db.commit()
+    # If this is a physical reward and is marked ready, create a per-user notification
+    if status == 'ready' and redemption.get('is_physical'):
+        try:
+            note_message = f"Your reward '{redemption.get('reward_name')}' is ready for pickup."
+            if admin_note:
+                note_message = note_message + f" Note: {admin_note}"
+            insert_cursor = db.cursor()
+            insert_cursor.execute("""
+                INSERT INTO notifications (student_id_number, message, link, status)
+                VALUES (%s, %s, %s, 'unread')
+            """, (redemption.get('student_id_number'), note_message, None))
+            db.commit()
+            insert_cursor.close()
+        except Exception:
+            # Swallow notification errors to avoid blocking admin workflow
+            pass
     cursor.close()
     db.close()
 
@@ -3209,9 +3329,27 @@ def mark_notifications_seen():
         return jsonify({'ok': False}), 401
 
     user = session['user']
+    # Mark global announcements as seen (existing behavior)
     announcements = fetch_announcements(limit=1, for_user=user)
     if announcements:
         session['last_seen_announcement_id'] = announcements[0]['id']
+
+    # Mark per-user notifications as read
+    try:
+        db = get_db()
+        ensure_notifications_table(db)
+        cursor = db.cursor()
+        cursor.execute("""
+            UPDATE notifications
+            SET status='read'
+            WHERE student_id_number=%s AND status='unread'
+        """, (user['id_number'],))
+        db.commit()
+        cursor.close()
+        db.close()
+    except Exception:
+        pass
+
     return jsonify({'ok': True})
 
 

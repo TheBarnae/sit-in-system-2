@@ -25,6 +25,19 @@
           </button>
           <div class="dropdown-menu dropdown-menu-end p-2 notify-menu">
             <div class="small text-uppercase text-muted fw-semibold px-2 py-1">Notices</div>
+            {% if user_notifications %}
+              {% for note in user_notifications %}
+                <div class="notify-item px-2 py-2">
+                  <div class="d-flex justify-content-between align-items-center">
+                    <span class="small fw-semibold">System</span>
+                    <span class="small text-muted">{{ note.date }}</span>
+                  </div>
+                  <div class="small text-muted">{{ note.message }}</div>
+                </div>
+              {% endfor %}
+              <div class="dropdown-divider my-1"></div>
+            {% endif %}
+
             {% for announcement in announcements %}
               <div class="notify-item px-2 py-2">
                 <div class="d-flex justify-content-between align-items-center">
@@ -37,7 +50,9 @@
                 <div class="small text-muted">{{ announcement.body }}</div>
               </div>
             {% else %}
-              <div class="px-2 py-2 small text-muted">No notifications yet.</div>
+              {% if not user_notifications %}
+                <div class="px-2 py-2 small text-muted">No notifications yet.</div>
+              {% endif %}
             {% endfor %}
           </div>
         </div>
