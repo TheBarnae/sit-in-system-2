@@ -2007,27 +2007,38 @@ def admin_sit_in_reports_pdf():
 
     title = 'CCS Sit-in History Report'
 
-    # Draw header: logo + university and department text
-    logo_path = os.path.join(app.root_path, 'static', 'images', 'CCS_UC.png')
-    logo_w = 0.6 * inch
-    logo_h = 0.6 * inch
+    # Draw header: left + right logos, university and department text
+    left_logo_path = os.path.join(app.root_path, 'static', 'images', 'CCS_UC.png')
+    right_logo_path = os.path.join(app.root_path, 'static', 'images', 'uclogo.png')
+    logo_w = 0.7 * inch
+    logo_h = 0.7 * inch
     top_y = height - margin
+
+    # Left logo
     try:
-        if os.path.exists(logo_path):
-            pdf.drawImage(logo_path, margin, top_y - logo_h, width=logo_w, height=logo_h, preserveAspectRatio=True, mask='auto')
+        if os.path.exists(left_logo_path):
+            pdf.drawImage(left_logo_path, margin, top_y - logo_h, width=logo_w, height=logo_h, preserveAspectRatio=True, mask='auto')
     except Exception:
         pass
 
-    text_x = margin + logo_w + (0.15 * inch)
+    # Right logo
+    try:
+        if os.path.exists(right_logo_path):
+            pdf.drawImage(right_logo_path, width - margin - logo_w, top_y - logo_h, width=logo_w, height=logo_h, preserveAspectRatio=True, mask='auto')
+    except Exception:
+        pass
+
+    # University text near left logo
+    text_x = margin + logo_w + (0.12 * inch)
     pdf.setFont('Helvetica-Bold', 14)
     pdf.drawString(text_x, top_y - 6, 'University of Cebu')
     pdf.setFont('Helvetica', 12)
     pdf.drawString(text_x, top_y - 22, 'College of Computer Studies')
 
-    # Title centered below the header with clear spacing
+    # Title centered below logos with clear spacing
     pdf.setFont('Helvetica-Bold', 16)
     center_x = margin + (width - 2 * margin) / 2
-    title_y = top_y - logo_h - (0.25 * inch)
+    title_y = top_y - logo_h - (0.2 * inch)
     pdf.drawCentredString(center_x, title_y, title)
 
     # Filters and generated timestamp under the title
@@ -2042,7 +2053,7 @@ def admin_sit_in_reports_pdf():
     if form_values['date_to']:
         filter_text.append(f"To: {form_values['date_to']}")
 
-    filter_y = title_y - (0.25 * inch)
+    filter_y = title_y - (0.28 * inch)
     pdf.drawString(margin, filter_y, ' | '.join(filter_text) or 'All records')
     pdf.drawString(margin, filter_y - 12, f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
 
