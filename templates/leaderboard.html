@@ -22,7 +22,10 @@
             {{ user.first_name[0] }}{{ user.last_name[0] }}
           </span>
         {% endif %}
-        <span class="text-white me-3">Hello, {{ user.first_name }}!</span>
+        <span class="text-white me-2">Hello, {{ user.first_name }}!</span>
+        <div class="form-check form-switch me-2" title="Toggle Dark Mode">
+          <input class="form-check-input" type="checkbox" id="darkModeToggle">
+        </div>
         <div class="dropdown">
           <button class="navbar-toggler" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Toggle navigation">
             <span class="navbar-toggler-icon"></span>
@@ -33,14 +36,6 @@
             <li><a class="dropdown-item" href="/announcements">Announcements</a></li>
             <li><a class="dropdown-item" href="/shop">Rewards Shop</a></li>
             <li><a class="dropdown-item" href="/software">Software</a></li>
-            <li>
-              <div class="dropdown-item">
-                <div class="form-check form-switch d-flex align-items-center justify-content-between">
-                  <label class="form-check-label" for="darkModeToggle">Dark Mode</label>
-                  <input class="form-check-input ms-2" type="checkbox" id="darkModeToggle">
-                </div>
-              </div>
-            </li>
             <li><a class="dropdown-item" href="/logout">Log out</a></li>
           </ul>
         </div>
@@ -143,26 +138,7 @@
       });
     }, 7000);
   </script>
-    const storedTheme = localStorage.getItem('theme');
-    if (storedTheme === 'dark') {
-      document.body.classList.add('dark-mode');
-      document.documentElement.classList.add('dark-mode');
-    }
-    const darkToggle = document.getElementById('darkModeToggle');
-    if (darkToggle) {
-      darkToggle.checked = storedTheme === 'dark';
-      darkToggle.addEventListener('change', (event) => {
-        if (event.target.checked) {
-          document.body.classList.add('dark-mode');
-          document.documentElement.classList.add('dark-mode');
-          localStorage.setItem('theme', 'dark');
-        } else {
-          document.body.classList.remove('dark-mode');
-          document.documentElement.classList.remove('dark-mode');
-          localStorage.setItem('theme', 'light');
-        }
-      });
-    }
+    
 
 </body>
 </html>

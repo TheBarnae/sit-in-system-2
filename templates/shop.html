@@ -22,7 +22,10 @@
             {{ user.first_name[0] }}{{ user.last_name[0] }}
           </span>
         {% endif %}
-        <span class="text-white me-3">Hello, {{ user.first_name }}!</span>
+        <span class="text-white me-2">Hello, {{ user.first_name }}!</span>
+        <div class="form-check form-switch me-2" title="Toggle Dark Mode">
+          <input class="form-check-input" type="checkbox" id="darkModeToggle">
+        </div>
         <div class="dropdown">
           <button class="navbar-toggler" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Toggle navigation">
             <span class="navbar-toggler-icon"></span>
@@ -33,14 +36,6 @@
             <li><a class="dropdown-item" href="/announcements">Announcements</a></li>
             <li><a class="dropdown-item" href="/shop">Rewards Shop</a></li>
             <li><a class="dropdown-item" href="/software">Software</a></li>
-            <li>
-              <div class="dropdown-item">
-                <div class="form-check form-switch d-flex align-items-center justify-content-between">
-                  <label class="form-check-label" for="darkModeToggle">Dark Mode</label>
-                  <input class="form-check-input ms-2" type="checkbox" id="darkModeToggle">
-                </div>
-              </div>
-            </li>
             <li><a class="dropdown-item" href="/logout">Log out</a></li>
           </ul>
         </div>
@@ -96,26 +91,35 @@
           <div class="row g-3">
             {% for reward in rewards %}
               <div class="col-md-6">
-                <div class="info-card h-100">
+                <div class="reward-card h-100 p-3 rounded border">
                   {% set out_of_stock = reward.is_physical and (reward.stock is none or reward.stock <= 0) %}
-                  <div class="d-flex justify-content-between align-items-center mb-2">
-                    <strong>{{ reward.name }}</strong>
-                    <span class="badge text-bg-primary">{{ reward.points_cost }} pts</span>
+                  <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div>
+                      <h6 class="mb-0 fw-bold">{{ reward.name }}</h6>
+                      <div class="small text-muted mt-1">{{ reward.description or 'Reward item' }}</div>
+                    </div>
+                    <span class="badge rounded-pill bg-primary-subtle text-primary border border-primary-subtle">
+                      {{ reward.points_cost }} pts
+                    </span>
                   </div>
-                  <p class="text-muted small mb-2">{{ reward.description or 'Reward item' }}</p>
-                  <div class="small text-muted mb-2">
-                    {% if reward.is_physical %}
-                      Stock: {{ reward.stock if reward.stock is not none else 0 }}
-                    {% else %}
-                      Non-physical reward
-                    {% endif %}
+                  
+                  <div class="mt-auto pt-3 d-flex align-items-center justify-content-between">
+                    <div class="small">
+                      {% if reward.is_physical %}
+                        <span class="{% if out_of_stock %}text-danger{% else %}text-success{% endif %}">
+                          Stock: {{ reward.stock if reward.stock is not none else 0 }}
+                        </span>
+                      {% else %}
+                        <span class="text-secondary"><i class="bi bi-lightning-charge"></i> Instant Digital</span>
+                      {% endif %}
+                    </div>
+                    <form method="POST" action="/shop/redeem">
+                      <input type="hidden" name="reward_id" value="{{ reward.id }}">
+                      <button class="btn btn-sm {% if out_of_stock %}btn-secondary{% else %}btn-primary{% endif %}" type="submit" {% if out_of_stock %}disabled{% endif %}>
+                        {% if out_of_stock %}Out of Stock{% else %}Redeem Now{% endif %}
+                      </button>
+                    </form>
                   </div>
-                  <form method="POST" action="/shop/redeem">
-                    <input type="hidden" name="reward_id" value="{{ reward.id }}">
-                    <button class="btn btn-sm btn-primary" type="submit" {% if out_of_stock %}disabled{% endif %}>
-                      {% if out_of_stock %}Out of Stock{% else %}Redeem{% endif %}
-                    </button>
-                  </form>
                 </div>
               </div>
             {% else %}

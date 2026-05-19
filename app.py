@@ -2089,10 +2089,9 @@ def admin_toggle_reservation_seat():
         flash(f'PC {seat_no} marked as occupied.', 'success')
     elif row['student_id_number'] == ADMIN_SEAT_BLOCK_ID:
         cursor.execute("""
-            UPDATE reservations
-            SET status='cancelled', decided_at=NOW(), decided_by=%s, admin_note=%s
+            DELETE FROM reservations
             WHERE id=%s
-        """, (admin_id, 'Released from admin seat panel', row['id']))
+        """, (row['id'],))
         db.commit()
         flash(f'PC {seat_no} is now available.', 'success')
     else:
@@ -2836,20 +2835,40 @@ def student_software():
         LIMIT 1
     """, (user['id_number'],))
     assigned_row = cursor.fetchone() or {}
-    assigned_lab = (assigned_row.get('lab_assigned') or '').strip()
+    
+    # Priority 1: Check if student has an ACTIVE sit-in session right now
+    ensure_sit_in_logs_table(db)
+    cursor.execute("""
+        SELECT lab FROM sit_in_logs 
+        WHERE student_id_number=%s AND status='active' 
+        ORDER BY started_at DESC LIMIT 1
+    """, (user['id_number'],))
+    active_session = cursor.fetchone()
+    
+    if active_session:
+        assigned_lab = active_session['lab']
+    else:
+        # Priority 2: Fallback to the persistent lab_assigned column
+        assigned_lab = (assigned_row.get('lab_assigned') or '').strip()
+
     if assigned_lab and assigned_lab not in LAB_LOOKUP:
         assigned_lab = ''
 
-    rows = []
-    if assigned_lab:
-        cursor.execute("""
-            SELECT id, title, description, lab_code, original_name, file_size, created_at
-            FROM software_assets
-            WHERE status='active'
-              AND (lab_code=%s OR lab_code IS NULL OR lab_code='')
-            ORDER BY created_at DESC
-        """, (assigned_lab,))
-        rows = cursor.fetchall()
+    # Build the query to include both assigned lab and ALL Other Lab sections
+    # Excluding libraries or system files, we show assets tagged to the user's lab OR 'All Labs' (null/empty)
+    cursor.execute("""
+        SELECT id, title, description, lab_code, original_name, file_size, created_at
+        FROM software_assets
+        WHERE status='active'
+        ORDER BY 
+            CASE 
+                WHEN lab_code = %s THEN 0 
+                WHEN lab_code IS NULL OR lab_code = '' THEN 1
+                ELSE 2 
+            END ASC,
+            created_at DESC
+    """, (assigned_lab,))
+    rows = cursor.fetchall()
 
     cursor.close()
     db.close()

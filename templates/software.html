@@ -22,7 +22,10 @@
             {{ session.get('user', {}).get('first_name', 'U')[0] }}{{ session.get('user', {}).get('last_name', '')[0] }}
           </span>
         {% endif %}
-        <span class="text-white me-3">Hello, {{ session.get('user', {}).get('first_name', 'User') }}!</span>
+        <span class="text-white me-2">Hello, {{ session.get('user', {}).get('first_name', 'User') }}!</span>
+        <div class="form-check form-switch me-2" title="Toggle Dark Mode">
+          <input class="form-check-input" type="checkbox" id="darkModeToggle">
+        </div>
         <div class="dropdown">
           <button class="navbar-toggler" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Toggle navigation">
             <span class="navbar-toggler-icon"></span>
@@ -33,14 +36,6 @@
             <li><a class="dropdown-item" href="/announcements">Announcements</a></li>
             <li><a class="dropdown-item" href="/shop">Rewards Shop</a></li>
             <li><a class="dropdown-item" href="/software">Software</a></li>
-            <li>
-              <div class="dropdown-item">
-                <div class="form-check form-switch d-flex align-items-center justify-content-between">
-                  <label class="form-check-label" for="darkModeToggle">Dark Mode</label>
-                  <input class="form-check-input ms-2" type="checkbox" id="darkModeToggle">
-                </div>
-              </div>
-            </li>
             <li><a class="dropdown-item" href="/logout">Log out</a></li>
           </ul>
         </div>
@@ -50,51 +45,78 @@
 
   <div class="container mt-4 dashboard-shell">
     <div class="section-head mb-3">
-      <h4 class="section-title">Available Software</h4>
-      <p class="section-subtitle mb-0">Download apps and documents assigned to your lab.</p>
+      <h4 class="section-title">Library & Software</h4>
+      <p class="section-subtitle mb-0">Browse files for your assigned lab and general resources.</p>
     </div>
 
-    <div class="info-card mb-4">
-      <div class="row g-2 align-items-end">
-        <div class="col-md-6">
-          <label class="form-label mb-1">Assigned Lab</label>
-          <input class="form-control" type="text" value="{{ assigned_label or 'Unassigned' }}" readonly>
+    <div class="row g-3">
+      <div class="col-md-3">
+        <div class="info-card h-100 shadow-sm border-0">
+          <div class="card-body">
+            <h6 class="fw-bold mb-3 text-primary"><i class="fas fa-id-card me-2"></i>Access Profile</h6>
+            <div class="mb-3">
+              <label class="small text-muted d-block mb-1">Your Lab</label>
+              <div class="p-2 rounded fw-bold border-start border-3 border-primary" 
+                   style="background: var(--surface-muted); color: var(--ink-strong);">
+                {{ assigned_label or 'Unassigned' }}
+              </div>
+            </div>
+            <div class="alert alert-info py-2 small border-0 mb-0" style="background: var(--brand-soft); color: var(--brand);">
+               <i class="fas fa-info-circle me-1"></i> You can view files from your lab and general sections, but downloads are only permitted for files matching your current lab or public assets.
+            </div>
+          </div>
         </div>
       </div>
-    </div>
 
-    <div class="info-card">
-      <div class="table-responsive">
-        <table class="table align-middle table-compact">
-          <thead>
-            <tr>
-              <th>Title</th>
-              <th>Description</th>
-              <th>Lab</th>
-              <th>File</th>
-              <th>Size</th>
-              <th>Uploaded</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for row in rows %}
-              <tr>
-                <td>{{ row.title }}</td>
-                <td>{{ row.description or '-' }}</td>
-                <td>{{ row.lab_label }}</td>
-                <td>{{ row.original_name }}</td>
-                <td>{{ '%.2f'|format((row.file_size or 0) / 1024 / 1024) }} MB</td>
-                <td>{{ row.created_at.strftime('%Y-%m-%d %H:%M') if row.created_at }}</td>
-                <td>
-                  <a class="btn btn-sm btn-outline-primary" href="/software/download/{{ row.id }}">Download</a>
-                </td>
-              </tr>
-            {% else %}
-              <tr><td colspan="7" class="text-center text-muted">No files available.</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
+      <div class="col-md-9">
+        <div class="info-card shadow-sm border-0">
+          <div class="table-responsive">
+            <table class="table align-middle table-hover mb-0">
+              <thead class="small text-uppercase">
+                <tr>
+                  <th class="border-0">Resource</th>
+                  <th class="border-0">Location</th>
+                  <th class="border-0">Details</th>
+                  <th class="border-0 text-end">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in rows %}
+                  <tr>
+                    <td class="border-0">
+                      <div class="fw-bold">{{ row.title }}</div>
+                      <div class="text-muted small text-truncate" style="max-width: 300px;">{{ row.description or 'No description' }}</div>
+                    </td>
+                    <td class="border-0">
+                      <span class="badge {% if row.lab_code == assigned_lab %}bg-primary{% elif not row.lab_code or row.lab_code == '' %}bg-success{% else %}bg-secondary{% endif %}">
+                        {{ row.lab_label }}
+                      </span>
+                    </td>
+                    <td class="border-0">
+                      <div class="small fw-semibold">{{ row.original_name }}</div>
+                      <div class="text-muted" style="font-size: 0.75rem;">
+                        {{ '%.2f'|format((row.file_size or 0) / 1024 / 1024) }} MB &bull; {{ row.created_at.strftime('%m/%d/%Y') if row.created_at }}
+                      </div>
+                    </td>
+                    <td class="text-end border-0">
+                      {% if not row.lab_code or row.lab_code == '' or row.lab_code == assigned_lab %}
+                        <a class="btn btn-sm btn-primary px-3 shadow-sm" href="/software/download/{{ row.id }}">
+                          <i class="fas fa-download me-1"></i> Download
+                        </a>
+                      {% else %}
+                        <button class="btn btn-sm btn-outline-secondary px-3 opacity-50" disabled title="Gated by Lab Assignment">
+                          <i class="fas fa-lock me-1"></i> Locked
+                        </button>
+                      {% endif %}
+                    </td>
+                  </tr>
+                {% else %}
+                  <tr><td colspan="4" class="text-center py-5 text-muted border-0">No files available at this time.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
   </div>

@@ -22,79 +22,107 @@
   </div>
   {% if feedback_rows %}
     <div class="table-responsive">
-      <table class="table align-middle">
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>Student</th>
-            <th>Course</th>
-            <th>Lab</th>
-            <th>Purpose</th>
-            <th>Rating</th>
-            <th>Student Feedback</th>
-            <th>Admin Review</th>
-            <th>Reason</th>
-            <th>Points</th>
-            <th>Action</th>
+      <table class="table table-hover align-middle mb-0">
+        <thead style="background: var(--surface-muted);">
+          <tr class="small text-uppercase" style="color: var(--ink-muted);">
+            <th style="min-width: 120px;" class="border-0">Date & Student</th>
+            <th class="border-0">Room & Purpose</th>
+            <th class="text-center border-0">Rating</th>
+            <th style="width: 25%;" class="border-0">Feedback Notes</th>
+            <th style="width: 20%;" class="border-0">Admin Response</th>
+            <th class="text-center border-0">Points</th>
+            <th class="text-end border-0">Action</th>
           </tr>
         </thead>
         <tbody>
           {% for row in feedback_rows %}
-            <tr>
-              <td>{{ row.created_at.strftime('%b %d, %Y %I:%M %p') if row.created_at }}</td>
-              <td>
-                <div class="fw-semibold">{{ row.full_name or '-' }}</div>
-                <div class="text-muted small">{{ row.id_number or '' }}</div>
+            <tr class="border-bottom-0">
+              <td class="border-0">
+                <div class="fw-bold" style="color: var(--ink-strong);">{{ row.full_name or '-' }}</div>
+                <div class="text-muted small mb-1">{{ row.id_number or '' }}</div>
+                <div class="text-muted" style="font-size: 0.75rem;">{{ row.created_at.strftime('%b %d, %Y %I:%M %p') if row.created_at }}</div>
               </td>
-              <td>{{ row.course or '-' }} {{ row.course_level or '' }}</td>
-              <td>{{ row.lab_label }}</td>
-              <td>{{ row.purpose or 'General use' }}</td>
-              <td>{{ row.rating if row.rating else '-' }}</td>
-              <td>{{ row.feedback_text }}</td>
-              <td>
-                {% if row.admin_feedback_text %}
-                  <div>{{ row.admin_feedback_text }}</div>
-                  <div class="small text-muted mt-1">
-                    {{ row.tidiness_status|replace('_', ' ')|title if row.tidiness_status else 'Not tagged' }}
+              <td class="border-0">
+                <div class="badge border mb-1" style="background: var(--surface-muted); color: var(--ink-strong); border-color: var(--line-soft) !important;">{{ row.lab_label }}</div>
+                <div class="small fw-semibold text-muted text-truncate" style="max-width: 150px;">{{ row.purpose or 'General use' }}</div>
+              </td>
+              <td class="text-center border-0">
+                {% if row.rating %}
+                  <div class="d-flex flex-column align-items-center">
+                    <span class="fw-bold fs-5 text-primary">{{ row.rating }}</span>
+                    <div class="text-warning small" style="letter-spacing: -2px;">
+                      {% for i in range(5) %}{{ '★' if i < row.rating else '☆' }}{% endfor %}
+                    </div>
                   </div>
                 {% else %}
-                  <span class="text-muted small">No admin review yet</span>
+                  <span class="text-muted border-0">-</span>
                 {% endif %}
               </td>
-              <td>{{ row.admin_points_reason or '-' }}</td>
-              <td>
-                <span class="fw-semibold text-success">{{ row.points_awarded or 0 }}</span>
+              <td class="border-0">
+                <div class="p-2 rounded border-start border-4 border-info small" style="background: var(--surface-muted); color: var(--ink-strong);">
+                  {{ row.feedback_text }}
+                </div>
               </td>
-              <td>
-                <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#adminReview{{ row.id }}" aria-expanded="false" aria-controls="adminReview{{ row.id }}">
-                  {% if row.admin_feedback_text or row.points_awarded %}Update{% else %}Review{% endif %}
+              <td class="border-0">
+                {% if row.admin_feedback_text %}
+                  <div class="small mb-1" style="color: var(--ink-strong);">
+                    <i class="fas fa-reply text-muted me-1"></i>{{ row.admin_feedback_text }}
+                  </div>
+                  {% if row.admin_points_reason %}
+                    <div class="text-muted" style="font-size: 0.7rem;">
+                      <span class="badge me-1" style="background: var(--line-soft); color: var(--ink-muted);">Reason</span>{{ row.admin_points_reason }}
+                    </div>
+                  {% endif %}
+                  {% if row.tidiness_status %}
+                    <div class="mt-1">
+                      <span class="badge {% if row.tidiness_status == 'tidy' %}bg-success-subtle text-success{% else %}bg-danger-subtle text-danger{% endif %} small">
+                        {{ row.tidiness_status|replace('_', ' ')|title }}
+                      </span>
+                    </div>
+                  {% endif %}
+                {% else %}
+                  <span class="text-muted italic small">Pending review...</span>
+                {% endif %}
+              </td>
+              <td class="text-center border-0">
+                <span class="badge bg-success rounded-pill px-3">{{ row.points_awarded or 0 }} pts</span>
+              </td>
+              <td class="text-end border-0">
+                <button class="btn btn-sm {% if row.admin_feedback_text %}btn-outline-secondary{% else %}btn-primary{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#adminReview{{ row.id }}">
+                  <i class="fas {% if row.admin_feedback_text %}fa-edit{% else %}fa-check-circle{% endif %}"></i>
                 </button>
               </td>
             </tr>
-            <tr class="collapse" id="adminReview{{ row.id }}">
-              <td colspan="11">
-                <form class="row g-2" method="POST" action="/admin/feedback/{{ row.id }}/review">
-                  <div class="col-md-4">
-                    <input type="text" class="form-control" name="admin_feedback_text" placeholder="Feedback to student" value="{{ row.admin_feedback_text or '' }}" required>
-                  </div>
-                  <div class="col-md-3">
-                    <input type="text" class="form-control" name="admin_points_reason" placeholder="Reason for points" value="{{ row.admin_points_reason or '' }}" required>
-                  </div>
-                  <div class="col-md-2">
-                    <select class="form-select" name="tidiness_status">
-                      <option value="" {% if not row.tidiness_status %}selected{% endif %}>Criteria tag (optional)</option>
-                      <option value="tidy" {% if row.tidiness_status == 'tidy' %}selected{% endif %}>Tidy</option>
-                      <option value="not_tidy" {% if row.tidiness_status == 'not_tidy' %}selected{% endif %}>Not tidy</option>
-                    </select>
-                  </div>
-                  <div class="col-md-1">
-                    <input type="number" min="0" max="100" class="form-control" name="points_awarded" placeholder="Points" value="{{ row.points_awarded or 0 }}">
-                  </div>
-                  <div class="col-md-2 d-grid">
-                    <button class="btn btn-success" type="submit">Save</button>
-                  </div>
-                </form>
-                <div class="small text-muted mt-2">Admin comment and reason are required. Tidiness is only an optional criteria tag.</div>
+            <tr class="collapse shadow-sm" id="adminReview{{ row.id }}">
+              <td colspan="7" class="p-3 border-0" style="background: var(--surface-muted);">
+                <div class="card card-body border-0 bg-transparent py-0">
+                  <h6 class="mb-3 fw-bold text-muted small"><i class="fas fa-tools me-2"></i>Reviewing Feedback from {{ row.full_name }}</h6>
+                  <form class="row g-2" method="POST" action="/admin/feedback/{{ row.id }}/review">
+                    <div class="col-md-4">
+                      <label class="small text-muted mb-1">Response to Student</label>
+                      <input type="text" class="form-control form-control-sm" name="admin_feedback_text" placeholder="e.g., Thank you for reporting!" value="{{ row.admin_feedback_text or '' }}" required>
+                    </div>
+                    <div class="col-md-3">
+                      <label class="small text-muted mb-1">Internal Reason</label>
+                      <input type="text" class="form-control form-control-sm" name="admin_points_reason" placeholder="e.g., Reporting issue" value="{{ row.admin_points_reason or '' }}" required>
+                    </div>
+                    <div class="col-md-2">
+                      <label class="small text-muted mb-1">Tag Status</label>
+                      <select class="form-select form-select-sm" name="tidiness_status">
+                        <option value="" {% if not row.tidiness_status %}selected{% endif %}>No Tag</option>
+                        <option value="tidy" {% if row.tidiness_status == 'tidy' %}selected{% endif %}>Tidy / Good</option>
+                        <option value="not_tidy" {% if row.tidiness_status == 'not_tidy' %}selected{% endif %}>Not Tidy</option>
+                      </select>
+                    </div>
+                    <div class="col-md-1">
+                      <label class="small text-muted mb-1">Points</label>
+                      <input type="number" min="0" max="100" class="form-control form-control-sm text-success fw-bold" name="points_awarded" value="{{ row.points_awarded or 0 }}">
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                      <button class="btn btn-sm btn-success w-100" type="submit"><i class="fas fa-save me-1"></i>Submit</button>
+                    </div>
+                  </form>
+                </div>
               </td>
             </tr>
           {% endfor %}
