@@ -762,7 +762,40 @@ def lookup_student_session(cursor, student_id):
 
 @app.route('/')
 def login():
-    return render_template('login.html')
+    db = get_db()
+    cursor = db.cursor(dictionary=True)
+    cursor.execute("""
+        SELECT
+            u.last_name,
+            u.first_name,
+            u.middle_name,
+            u.course,
+            u.course_level,
+            stats.admin_points,
+            stats.completed_sessions
+        FROM users u
+        JOIN (
+            SELECT
+                s.student_id_number,
+                SUM(COALESCE(f.points_awarded, 0)) AS admin_points,
+                SUM(CASE WHEN s.status='completed' THEN 1 ELSE 0 END) AS completed_sessions
+            FROM sit_in_logs s
+            LEFT JOIN user_feedback f ON f.sit_in_log_id = s.id
+            GROUP BY s.student_id_number
+        ) stats ON stats.student_id_number = u.id_number
+        WHERE u.id_number NOT LIKE 'adm-%'
+        ORDER BY admin_points DESC, completed_sessions DESC, u.last_name ASC
+        LIMIT 5
+    """)
+    leaderboard = cursor.fetchall()
+
+    for row in leaderboard:
+        mname = f" {row['middle_name'][0]}." if row.get('middle_name') else ""
+        row['display_name'] = f"{row['first_name']}{mname} {row['last_name']}"
+
+    cursor.close()
+    db.close()
+    return render_template('login.html', leaderboard=leaderboard)
 
 
 @app.route('/register')
@@ -1649,10 +1682,14 @@ def admin_feedback_reports():
         flash('Please log in as admin.', 'danger')
         return redirect('/')
 
+    # Get filter parameter
+    rating_filter = request.args.get('rating')
+
     db = get_db()
     ensure_user_feedback_table(db)
     cursor = db.cursor(dictionary=True)
-    cursor.execute("""
+
+    query = """
         SELECT
             f.id,
             f.sit_in_log_id,
@@ -1678,8 +1715,16 @@ def admin_feedback_reports():
         FROM user_feedback f
         LEFT JOIN users u ON u.id_number = f.student_id_number
         LEFT JOIN sit_in_logs s ON s.id = f.sit_in_log_id
-        ORDER BY f.created_at DESC
-    """)
+    """
+    
+    params = []
+    if rating_filter and rating_filter.isdigit():
+        query += " WHERE f.rating = %s "
+        params.append(int(rating_filter))
+
+    query += " ORDER BY f.created_at DESC "
+    
+    cursor.execute(query, params)
     feedback_rows = cursor.fetchall()
     cursor.close()
     db.close()

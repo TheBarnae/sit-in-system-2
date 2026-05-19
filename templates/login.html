@@ -55,6 +55,46 @@
         <a href="/reset_password">Forgot password?</a><br>
         Don't have an account? <a href="/register">Register</a>
       </p>
+
+      {% if leaderboard %}
+        <hr class="my-4">
+        <div class="leaderboard-section">
+          <h6 class="text-center mb-3 text-primary"><i class="fas fa-trophy me-1"></i> Top Students (Points)</h6>
+          <div class="table-responsive">
+            <table class="table table-sm table-borderless align-middle mb-0" style="font-size: 0.85rem;">
+              <thead>
+                <tr class="text-muted small">
+                  <th>Rank</th>
+                  <th>Name</th>
+                  <th class="text-end">Points</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for entry in leaderboard %}
+                  <tr>
+                    <td>
+                      {% if loop.index == 1 %}
+                        <span class="badge bg-warning text-dark">1st</span>
+                      {% elif loop.index == 2 %}
+                        <span class="badge bg-secondary text-white">2nd</span>
+                      {% elif loop.index == 3 %}
+                        <span class="badge bg-bronze text-white" style="background-color: #cd7f32;">3rd</span>
+                      {% else %}
+                        <span class="ms-1">{{ loop.index }}th</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      <div class="fw-semibold">{{ entry.display_name }}</div>
+                      <div class="text-muted" style="font-size: 0.75rem;">{{ entry.course }} {{ entry.course_level }}</div>
+                    </td>
+                    <td class="text-end fw-bold text-success">{{ entry.admin_points }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      {% endif %}
     </div>
   </div>
 

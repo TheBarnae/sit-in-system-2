@@ -3,7 +3,23 @@
 
 {% block content %}
 <div class="info-card">
-  <h5 class="mb-3">Feedback Reports</h5>
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0">Feedback Reports</h5>
+    <form class="d-flex gap-2 align-items-center" method="GET" action="/admin/feedback-reports">
+      <label class="small text-muted text-nowrap">Filter by Rating:</label>
+      <select name="rating" class="form-select form-select-sm" style="width: auto;" onchange="this.form.submit()">
+        <option value="">All Ratings</option>
+        <option value="5" {% if request.args.get('rating') == '5' %}selected{% endif %}>5 - Excellent</option>
+        <option value="4" {% if request.args.get('rating') == '4' %}selected{% endif %}>4 - Very Good</option>
+        <option value="3" {% if request.args.get('rating') == '3' %}selected{% endif %}>3 - Good</option>
+        <option value="2" {% if request.args.get('rating') == '2' %}selected{% endif %}>2 - Fair</option>
+        <option value="1" {% if request.args.get('rating') == '1' %}selected{% endif %}>1 - Poor</option>
+      </select>
+      {% if request.args.get('rating') %}
+        <a href="/admin/feedback-reports" class="btn btn-sm btn-link text-decoration-none">Clear</a>
+      {% endif %}
+    </form>
+  </div>
   {% if feedback_rows %}
     <div class="table-responsive">
       <table class="table align-middle">
