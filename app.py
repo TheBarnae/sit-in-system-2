@@ -2006,8 +2006,31 @@ def admin_sit_in_reports_pdf():
     margin = 0.7 * inch
 
     title = 'CCS Sit-in History Report'
+
+    # Draw header: logo + university and department text
+    logo_path = os.path.join(app.root_path, 'static', 'images', 'CCS_UC.png')
+    logo_w = 0.6 * inch
+    logo_h = 0.6 * inch
+    top_y = height - margin
+    try:
+        if os.path.exists(logo_path):
+            pdf.drawImage(logo_path, margin, top_y - logo_h, width=logo_w, height=logo_h, preserveAspectRatio=True, mask='auto')
+    except Exception:
+        pass
+
+    text_x = margin + logo_w + (0.15 * inch)
+    pdf.setFont('Helvetica-Bold', 14)
+    pdf.drawString(text_x, top_y - 6, 'University of Cebu')
+    pdf.setFont('Helvetica', 12)
+    pdf.drawString(text_x, top_y - 22, 'College of Computer Studies')
+
+    # Title centered below the header with clear spacing
     pdf.setFont('Helvetica-Bold', 16)
-    pdf.drawString(margin, height - margin, title)
+    center_x = margin + (width - 2 * margin) / 2
+    title_y = top_y - logo_h - (0.25 * inch)
+    pdf.drawCentredString(center_x, title_y, title)
+
+    # Filters and generated timestamp under the title
     pdf.setFont('Helvetica', 10)
     filter_text = []
     if form_values['student_id']:
@@ -2018,8 +2041,10 @@ def admin_sit_in_reports_pdf():
         filter_text.append(f"From: {form_values['date_from']}")
     if form_values['date_to']:
         filter_text.append(f"To: {form_values['date_to']}")
-    pdf.drawString(margin, height - margin - 14, ' | '.join(filter_text) or 'All records')
-    pdf.drawString(margin, height - margin - 28, f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+
+    filter_y = title_y - (0.25 * inch)
+    pdf.drawString(margin, filter_y, ' | '.join(filter_text) or 'All records')
+    pdf.drawString(margin, filter_y - 12, f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
 
     pdf.setFont('Helvetica-Bold', 10)
     headers = ['ID', 'Student', 'Course', 'Lab', 'Purpose', 'Status', 'Started', 'Ended']
@@ -2032,7 +2057,11 @@ def admin_sit_in_reports_pdf():
     # Right boundaries for right-aligned columns (small inner margin)
     col_rights = [col_positions[i] + col_widths[i] * inch - 6 for i in range(len(col_widths))]
 
-    y = height - margin - 50
+    # Start table a bit below the filter/timestamp area
+    try:
+        y = filter_y - (0.45 * inch)
+    except Exception:
+        y = height - margin - 50
     for idx, header in enumerate(headers):
         pdf.drawString(col_positions[idx], y, header)
     pdf.line(margin, y - 2, width - margin, y - 2)
