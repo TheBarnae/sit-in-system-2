@@ -2111,8 +2111,12 @@ def admin_reservations():
     ensure_sit_in_logs_table(db)
     ensure_reservations_table(db)
     cursor = db.cursor(dictionary=True)
+    # Reservation table filter params
+    search_q = (request.args.get('q') or '').strip()
+    status_filter = (request.args.get('status_filter') or '').strip().lower()
 
-    cursor.execute("""
+    # Build reservation query with optional filters
+    base_query = """
         SELECT
             r.id,
             r.student_id_number,
@@ -2131,8 +2135,19 @@ def admin_reservations():
         FROM reservations r
         LEFT JOIN users u ON u.id_number = r.student_id_number
         WHERE r.student_id_number <> %s
-        ORDER BY CASE r.status WHEN 'pending' THEN 0 ELSE 1 END, r.created_at DESC
-    """, (ADMIN_SEAT_BLOCK_ID,))
+    """
+    params = [ADMIN_SEAT_BLOCK_ID]
+    allowed_statuses = ('pending', 'approved', 'checked_in', 'denied', 'cancelled', 'no_show')
+    if status_filter in allowed_statuses:
+        base_query += " AND r.status = %s"
+        params.append(status_filter)
+    if search_q:
+        base_query += " AND (u.last_name LIKE %s OR u.first_name LIKE %s OR r.student_id_number LIKE %s)"
+        like_q = f"%{search_q}%"
+        params.extend([like_q, like_q, like_q])
+
+    base_query += " ORDER BY CASE r.status WHEN 'pending' THEN 0 ELSE 1 END, r.created_at DESC"
+    cursor.execute(base_query, params)
     reservation_rows = cursor.fetchall()
 
     cursor.execute("""
@@ -2181,7 +2196,10 @@ def admin_reservations():
                            selected_lab=selected_lab,
                            selected_date=selected_date,
                            selected_slot=selected_slot,
-                           seats=seats)
+                           seats=seats,
+                           capacity=selected_lab_info['capacity'],
+                           filter_q=search_q,
+                           filter_status=status_filter)
 
 
 @app.route('/admin/reservations/seat/toggle', methods=['POST'])
@@ -2369,6 +2387,151 @@ def admin_unblock_all_seats():
         flash(f'Enabled {released} PC(s).', 'success')
     else:
         flash('No admin-blocked PCs to enable for this schedule.', 'info')
+
+    return redirect(f"/admin/reservations?lab_code={lab_code}&reservation_date={reservation_date}&reservation_slot={reservation_slot}")
+
+
+@app.route('/admin/reservations/seat/block-range', methods=['POST'])
+def admin_block_range_seats():
+    if not is_admin_user():
+        flash('Please log in as admin.', 'danger')
+        return redirect('/admin/reservations')
+
+    lab_code = (request.form.get('lab_code') or '').strip()
+    reservation_date = (request.form.get('reservation_date') or '').strip()
+    reservation_slot = (request.form.get('reservation_slot') or '').strip()
+    from_raw = (request.form.get('from_seat') or '').strip()
+    to_raw = (request.form.get('to_seat') or '').strip()
+
+    if lab_code not in LAB_LOOKUP or reservation_slot not in RESERVATION_SLOTS:
+        flash('Invalid seat block request.', 'warning')
+        return redirect('/admin/reservations')
+
+    try:
+        from_seat = int(from_raw)
+        to_seat = int(to_raw)
+    except ValueError:
+        flash('Invalid seat range specified.', 'warning')
+        return redirect('/admin/reservations')
+
+    if from_seat > to_seat:
+        from_seat, to_seat = to_seat, from_seat
+
+    capacity = LAB_LOOKUP[lab_code]['capacity']
+    if from_seat < 1 or to_seat > capacity:
+        flash('Seat range is out of bounds for the selected lab.', 'warning')
+        return redirect(f"/admin/reservations?lab_code={lab_code}&reservation_date={reservation_date}&reservation_slot={reservation_slot}")
+
+    try:
+        datetime.strptime(reservation_date, '%Y-%m-%d')
+    except ValueError:
+        flash('Invalid reservation date.', 'warning')
+        return redirect('/admin/reservations')
+
+    db = get_db()
+    ensure_reservations_table(db)
+    cursor = db.cursor(dictionary=True)
+
+    cursor.execute("""
+        SELECT seat_no
+        FROM reservations
+        WHERE lab_code=%s
+          AND reservation_date=%s
+          AND reservation_slot=%s
+          AND seat_no BETWEEN %s AND %s
+          AND status IN ('pending', 'approved', 'checked_in')
+    """, (lab_code, reservation_date, reservation_slot, from_seat, to_seat))
+    existing = {row['seat_no'] for row in cursor.fetchall()}
+
+    admin_id = session.get('user', {}).get('id_number', 'admin')
+    blocked_count = 0
+    skipped_count = 0
+    for seat_no in range(from_seat, to_seat + 1):
+        if seat_no in existing:
+            skipped_count += 1
+            continue
+        cursor.execute("""
+            INSERT INTO reservations (
+                student_id_number, lab_code, seat_no, purpose,
+                reservation_date, reservation_slot, status, admin_note, decided_at, decided_by
+            ) VALUES (%s, %s, %s, %s, %s, %s, 'approved', %s, NOW(), %s)
+        """, (ADMIN_SEAT_BLOCK_ID, lab_code, seat_no, 'Admin seat block', reservation_date, reservation_slot, 'Occupied by admin seat panel', admin_id))
+        blocked_count += 1
+
+    db.commit()
+    cursor.close()
+    db.close()
+
+    if blocked_count:
+        flash(f'Disabled {blocked_count} PC(s). Skipped {skipped_count} already taken.', 'success')
+    else:
+        flash('No available PCs to disable in the specified range.', 'info')
+
+    return redirect(f"/admin/reservations?lab_code={lab_code}&reservation_date={reservation_date}&reservation_slot={reservation_slot}")
+
+
+@app.route('/admin/reservations/seat/unblock-range', methods=['POST'])
+def admin_unblock_range_seats():
+    if not is_admin_user():
+        flash('Please log in as admin.', 'danger')
+        return redirect('/admin/reservations')
+
+    lab_code = (request.form.get('lab_code') or '').strip()
+    reservation_date = (request.form.get('reservation_date') or '').strip()
+    reservation_slot = (request.form.get('reservation_slot') or '').strip()
+    from_raw = (request.form.get('from_seat') or '').strip()
+    to_raw = (request.form.get('to_seat') or '').strip()
+
+    if lab_code not in LAB_LOOKUP or reservation_slot not in RESERVATION_SLOTS:
+        flash('Invalid seat release request.', 'warning')
+        return redirect('/admin/reservations')
+
+    try:
+        from_seat = int(from_raw)
+        to_seat = int(to_raw)
+    except ValueError:
+        flash('Invalid seat range specified.', 'warning')
+        return redirect('/admin/reservations')
+
+    if from_seat > to_seat:
+        from_seat, to_seat = to_seat, from_seat
+
+    capacity = LAB_LOOKUP[lab_code]['capacity']
+    if from_seat < 1 or to_seat > capacity:
+        flash('Seat range is out of bounds for the selected lab.', 'warning')
+        return redirect(f"/admin/reservations?lab_code={lab_code}&reservation_date={reservation_date}&reservation_slot={reservation_slot}")
+
+    try:
+        datetime.strptime(reservation_date, '%Y-%m-%d')
+    except ValueError:
+        flash('Invalid reservation date.', 'warning')
+        return redirect('/admin/reservations')
+
+    db = get_db()
+    ensure_reservations_table(db)
+    cursor = db.cursor(dictionary=True)
+
+    admin_id = session.get('user', {}).get('id_number', 'admin')
+    cursor.execute("""
+        UPDATE reservations
+        SET status='cancelled', decided_at=NOW(), decided_by=%s, admin_note=%s
+        WHERE lab_code=%s
+          AND reservation_date=%s
+          AND reservation_slot=%s
+          AND student_id_number=%s
+          AND seat_no BETWEEN %s AND %s
+          AND status IN ('pending', 'approved')
+    """, (admin_id, 'Released from admin seat panel', lab_code, reservation_date, reservation_slot, ADMIN_SEAT_BLOCK_ID, from_seat, to_seat))
+
+    released = cursor.rowcount
+    db.commit()
+    cursor.close()
+    db.close()
+
+    if released:
+        flash(f'Enabled {released} PC(s).', 'success')
+    else:
+        flash('No admin-blocked PCs to enable in the specified range.', 'info')
 
     return redirect(f"/admin/reservations?lab_code={lab_code}&reservation_date={reservation_date}&reservation_slot={reservation_slot}")
 

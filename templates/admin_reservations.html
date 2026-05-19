@@ -47,6 +47,25 @@
           <input type="hidden" name="reservation_slot" value="{{ selected_slot }}">
           <button type="submit" class="btn btn-sm btn-outline-success">Enable All PCs</button>
         </form>
+        <form method="POST" action="/admin/reservations/seat/block-range" class="m-0 d-flex align-items-end gap-2">
+          <input type="hidden" name="lab_code" value="{{ selected_lab }}">
+          <input type="hidden" name="reservation_date" value="{{ selected_date }}">
+          <input type="hidden" name="reservation_slot" value="{{ selected_slot }}">
+          <div class="d-flex gap-1 align-items-center">
+            <label class="form-label mb-0 small">From</label>
+            <input type="number" name="from_seat" min="1" max="{{ capacity }}" value="1" class="form-control form-control-sm" style="width:80px">
+            <label class="form-label mb-0 small">To</label>
+            <input type="number" name="to_seat" min="1" max="{{ capacity }}" value="{{ capacity }}" class="form-control form-control-sm" style="width:80px">
+          </div>
+          <button type="submit" class="btn btn-sm btn-outline-danger">Disable Selected PCs</button>
+        </form>
+        <form method="POST" action="/admin/reservations/seat/unblock-range" class="m-0 d-flex align-items-end gap-2">
+          <input type="hidden" name="lab_code" value="{{ selected_lab }}">
+          <input type="hidden" name="reservation_date" value="{{ selected_date }}">
+          <input type="hidden" name="reservation_slot" value="{{ selected_slot }}">
+          <div style="width:1px;">&nbsp;</div>
+          
+        </form>
       </div>
 
       <div class="seat-grid">
@@ -74,6 +93,28 @@
   <div class="col-lg-7">
     <div class="info-card">
       <h5 class="mb-3">Reservation Requests</h5>
+      <form method="GET" action="/admin/reservations" class="row g-2 mb-3">
+        <input type="hidden" name="lab_code" value="{{ selected_lab }}">
+        <input type="hidden" name="reservation_date" value="{{ selected_date }}">
+        <input type="hidden" name="reservation_slot" value="{{ selected_slot }}">
+        <div class="col-sm-6 col-md-5">
+          <input type="text" class="form-control form-control-sm" name="q" placeholder="Search name or ID" value="{{ filter_q }}">
+        </div>
+        <div class="col-sm-4 col-md-3">
+          <select class="form-select form-select-sm" name="status_filter">
+            <option value="" {% if not filter_status %}selected{% endif %}>All status</option>
+            <option value="pending" {% if filter_status == 'pending' %}selected{% endif %}>Pending</option>
+            <option value="approved" {% if filter_status == 'approved' %}selected{% endif %}>Approved</option>
+            <option value="checked_in" {% if filter_status == 'checked_in' %}selected{% endif %}>Checked In</option>
+            <option value="denied" {% if filter_status == 'denied' %}selected{% endif %}>Denied</option>
+            <option value="cancelled" {% if filter_status == 'cancelled' %}selected{% endif %}>Cancelled</option>
+            <option value="no_show" {% if filter_status == 'no_show' %}selected{% endif %}>No-Show</option>
+          </select>
+        </div>
+        <div class="col-sm-2 col-md-2">
+          <button class="btn btn-primary btn-sm" type="submit">Filter</button>
+        </div>
+      </form>
       <div class="table-responsive">
         <table class="table align-middle">
           <thead>
