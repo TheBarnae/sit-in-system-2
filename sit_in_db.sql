@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: May 19, 2026 at 10:50 AM
+-- Generation Time: May 20, 2026 at 03:28 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -48,6 +48,21 @@ INSERT INTO `announcements` (`id`, `author`, `body`, `created_by_id`, `status`, 
 (2, 'CCS Admin', 'WELCOME STUDENTS!', 'adm-1234', 'active', '2026-04-14 02:16:30', 1, NULL, NULL),
 (3, 'CCS Admin', 'THIS IS AN ANNOUNCEMENT!', 'adm-1234', 'active', '2026-04-22 21:33:25', 0, NULL, NULL),
 (4, 'CCS Admin', 'New announcement!', 'adm-1234', 'active', '2026-04-22 22:07:10', 0, NULL, NULL);
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `notifications`
+--
+
+CREATE TABLE `notifications` (
+  `id` int(11) NOT NULL,
+  `student_id_number` varchar(20) NOT NULL,
+  `message` text NOT NULL,
+  `link` varchar(255) DEFAULT NULL,
+  `status` enum('unread','read') NOT NULL DEFAULT 'unread',
+  `created_at` datetime NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -277,6 +292,14 @@ ALTER TABLE `announcements`
   ADD KEY `idx_announcements_created_at` (`created_at`);
 
 --
+-- Indexes for table `notifications`
+--
+ALTER TABLE `notifications`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_notifications_student` (`student_id_number`),
+  ADD KEY `idx_notifications_status` (`status`);
+
+--
 -- Indexes for table `reservations`
 --
 ALTER TABLE `reservations`
@@ -341,6 +364,12 @@ ALTER TABLE `user_feedback`
 --
 ALTER TABLE `announcements`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+
+--
+-- AUTO_INCREMENT for table `notifications`
+--
+ALTER TABLE `notifications`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `reservations`
