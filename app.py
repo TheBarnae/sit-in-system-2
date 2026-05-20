@@ -2005,7 +2005,7 @@ def admin_sit_in_reports_pdf():
     width, height = landscape(letter)
     margin = 0.7 * inch
 
-    title = 'CCS Sit-in History Report'
+    title = 'Sit-in Monitoring System Utilization Report'
 
     # Draw header: left + right logos, university and department text
     left_logo_path = os.path.join(app.root_path, 'static', 'images', 'CCS_UC.png')
